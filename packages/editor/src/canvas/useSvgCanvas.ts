@@ -9,6 +9,8 @@ export type SvgCanvasInstance = InstanceType<typeof SvgCanvas>;
 interface UseSvgCanvasOptions {
   width?: number;
   height?: number;
+  /** Initial SVG string to load (from a previously saved CanvasModel.svgString) */
+  initialSvgString?: string;
   onModelChange?: (model: CanvasModel) => void;
 }
 
@@ -16,11 +18,13 @@ interface UseSvgCanvasReturn {
   containerRef: React.RefObject<HTMLDivElement>;
   canvas: SvgCanvasInstance | null;
   setTool: (tool: ToolId) => void;
+  getSvgString: () => string;
 }
 
 export function useSvgCanvas({
   width = 512,
   height = 512,
+  initialSvgString,
   onModelChange,
 }: UseSvgCanvasOptions = {}): UseSvgCanvasReturn {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -41,6 +45,11 @@ export function useSvgCanvas({
     canvasRef.current = svgCanvas;
     setCanvas(svgCanvas);
 
+    // Restore saved SVG if provided
+    if (initialSvgString) {
+      svgCanvas.setSvgString(initialSvgString);
+    }
+
     if (onModelChange) {
       svgCanvas.bind('changed', () => {
         const svgRoot = svgCanvas.getSvgContent();
@@ -53,7 +62,7 @@ export function useSvgCanvas({
     return () => {
       canvasRef.current = null;
     };
-  // onModelChange intentionally excluded — callers must memoize it
+  // onModelChange / initialSvgString intentionally excluded — callers must memoize them
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [width, height]);
 
@@ -61,5 +70,9 @@ export function useSvgCanvas({
     canvasRef.current?.setMode(tool);
   };
 
-  return { containerRef, canvas, setTool };
+  const getSvgString = (): string => {
+    return canvasRef.current?.getSvgString() ?? '';
+  };
+
+  return { containerRef, canvas, setTool, getSvgString };
 }

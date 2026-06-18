@@ -12,6 +12,8 @@ export interface CanvasModel {
   version: '1.0';
   canvas: { width: number; height: number };
   layers: LayerModel[];
+  /** Full SVG string snapshot from @svgedit/svgcanvas — used for save/restore */
+  svgString?: string;
 }
 
 export function createEmptyCanvas(

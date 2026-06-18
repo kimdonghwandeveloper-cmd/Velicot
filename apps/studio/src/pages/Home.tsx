@@ -1,11 +1,19 @@
-import React, { useState } from 'react'
-import type { CanvasModel } from '@velicot/editor'
+import React, { useRef, useState } from 'react'
+import { deserializeModel, type CanvasModel } from '@velicot/editor'
 import { NewFileDialog } from '../components/NewFileDialog'
 
-interface RecentFile {
+export interface RecentFile {
   filename: string
   timestamp: number
-  modelJson?: string
+  modelJson: string
+}
+
+export function saveRecent(filename: string, modelJson: string): void {
+  try {
+    const list: RecentFile[] = loadRecents().filter((r) => r.filename !== filename)
+    list.unshift({ filename, timestamp: Date.now(), modelJson })
+    localStorage.setItem('velicot-recents', JSON.stringify(list.slice(0, 20)))
+  } catch {}
 }
 
 function loadRecents(): RecentFile[] {
@@ -30,12 +38,42 @@ interface Props {
 
 export function Home({ onOpenEditor }: Props) {
   const [showNewFile, setShowNewFile] = useState(false)
-  const [recents] = useState<RecentFile[]>(loadRecents)
+  const [recents, setRecents] = useState<RecentFile[]>(loadRecents)
   const [activeNav, setActiveNav] = useState<string>('Home')
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleCreate = (model: CanvasModel, filename: string) => {
     setShowNewFile(false)
     onOpenEditor(model, filename)
+  }
+
+  const handleOpenFile = (file: RecentFile) => {
+    try {
+      const model = deserializeModel(file.modelJson)
+      onOpenEditor(model, file.filename)
+    } catch {
+      setLoadError(`Failed to load "${file.filename}"`)
+    }
+  }
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (!f) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const json = ev.target?.result as string
+        const model = deserializeModel(json)
+        saveRecent(f.name, json)
+        setRecents(loadRecents())
+        onOpenEditor(model, f.name)
+      } catch {
+        setLoadError(`"${f.name}" is not a valid .kfm.json file`)
+      }
+    }
+    reader.readAsText(f)
+    e.target.value = ''
   }
 
   return (
@@ -79,14 +117,24 @@ export function Home({ onOpenEditor }: Props) {
           }}>
             ALPHA 0.1.0
           </span>
+          {/* Hidden file input for importing .kfm.json */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,.kfm.json"
+            style={{ display: 'none' }}
+            onChange={handleImportFile}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            style={outlineBtnStyle}
+            title="Open existing .kfm.json file"
+          >
+            Open File
+          </button>
           <button
             onClick={() => setShowNewFile(true)}
-            style={{
-              background: '#fff', color: '#0d0d14',
-              borderRadius: 'var(--radius-sm)', padding: '6px 16px',
-              fontWeight: 600, fontSize: 13,
-              transition: 'opacity 0.1s',
-            }}
+            style={primaryBtnStyle}
           >
             New File
           </button>
@@ -116,10 +164,8 @@ export function Home({ onOpenEditor }: Props) {
             />
           ))}
 
-          <div style={{ margin: '12px 16px 4px', fontSize: 11, color: 'var(--text-3)' }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2,
-            }}>
+          <div style={{ margin: '12px 16px 4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <div style={{
                 width: 18, height: 18, borderRadius: 4,
                 background: 'var(--accent)', color: '#fff',
@@ -138,6 +184,21 @@ export function Home({ onOpenEditor }: Props) {
 
         {/* Main content */}
         <main style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
+          {loadError && (
+            <div style={{
+              marginBottom: 16, padding: '10px 14px',
+              background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
+              borderRadius: 'var(--radius-sm)', color: '#f87171', fontSize: 12,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <span>{loadError}</span>
+              <button
+                onClick={() => setLoadError(null)}
+                style={{ background: 'none', color: '#f87171', fontSize: 14 }}
+              >✕</button>
+            </div>
+          )}
+
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             marginBottom: 20,
@@ -156,9 +217,11 @@ export function Home({ onOpenEditor }: Props) {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 520 }}>
               {recents.map((f) => (
-                <FileCard key={f.filename + f.timestamp} file={f} onClick={() => {
-                  /* TODO: load and open */
-                }} />
+                <FileCard
+                  key={f.filename + f.timestamp}
+                  file={f}
+                  onClick={() => handleOpenFile(f)}
+                />
               ))}
             </div>
           )}
@@ -230,17 +293,9 @@ function EmptyState({ onNewFile }: { onNewFile: () => void }) {
         width: 64, height: 64, borderRadius: 'var(--radius-lg)',
         background: 'var(--bg-elevated)', border: '1px solid var(--border)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28,
-      }}>
-        ◆
-      </div>
+      }}>◆</div>
       <div style={{ color: 'var(--text-2)', fontSize: 14 }}>No recent files</div>
-      <button
-        onClick={onNewFile}
-        style={{
-          background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius-sm)',
-          padding: '8px 20px', fontWeight: 600, fontSize: 13,
-        }}
-      >
+      <button onClick={onNewFile} style={primaryBtnStyle}>
         Create your first file
       </button>
     </div>
@@ -259,16 +314,24 @@ function DiamondLogo() {
 
 function IconBtn({ children, title }: { children: React.ReactNode; title: string }) {
   return (
-    <button
-      title={title}
-      style={{
-        width: 28, height: 28, borderRadius: 'var(--radius-sm)',
-        background: 'transparent', color: 'var(--text-2)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 14,
-      }}
-    >
+    <button title={title} style={{
+      width: 28, height: 28, borderRadius: 'var(--radius-sm)',
+      background: 'transparent', color: 'var(--text-2)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
+    }}>
       {children}
     </button>
   )
+}
+
+const primaryBtnStyle: React.CSSProperties = {
+  background: 'var(--accent)', color: '#fff',
+  borderRadius: 'var(--radius-sm)', padding: '6px 16px',
+  fontWeight: 600, fontSize: 13,
+}
+
+const outlineBtnStyle: React.CSSProperties = {
+  background: 'transparent', color: 'var(--text-2)',
+  border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
+  padding: '5px 14px', fontSize: 13,
 }

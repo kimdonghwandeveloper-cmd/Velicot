@@ -5,6 +5,7 @@ import {
 import { EditorToolbar, type EditorToolId } from '../components/EditorToolbar'
 import { LayersPanel } from '../components/LayersPanel'
 import { Timeline } from '../components/Timeline'
+import { saveRecent } from './Home'
 
 type EditorTab = 'Design' | 'Animate' | 'State Machine'
 
@@ -22,9 +23,10 @@ export function Editor({ filename, initialModel, onBackToHome }: Props) {
 
   const handleModelChange = useCallback((m: CanvasModel) => setModel(m), [])
 
-  const { containerRef, canvas, setTool } = useSvgCanvas({
+  const { containerRef, canvas, setTool, getSvgString } = useSvgCanvas({
     width: initialModel?.canvas.width ?? 512,
     height: initialModel?.canvas.height ?? 512,
+    initialSvgString: initialModel?.svgString,
     onModelChange: handleModelChange,
   })
 
@@ -37,9 +39,12 @@ export function Editor({ filename, initialModel, onBackToHome }: Props) {
 
   const handleExport = () => {
     if (!model) return
-    const json = serializeModel(model)
+    // Embed the full SVG string so the file can be round-tripped back into the editor
+    const modelWithSvg = { ...model, svgString: getSvgString() }
+    const json = serializeModel(modelWithSvg)
     const blob = new Blob([json], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
+    saveRecent(filename, json)
     const a = document.createElement('a')
     a.href = url
     a.download = filename
