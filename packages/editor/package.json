@@ -22,7 +22,8 @@
     "react-dom": "^18.0.0"
   },
   "dependencies": {
-    "@svgedit/svgcanvas": "^7.3.10"
+    "@svgedit/svgcanvas": "^7.3.10",
+    "d3-ease": "^3.0.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.0",

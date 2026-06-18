@@ -4,7 +4,7 @@
     {
       "name": "studio",
       "runtimeExecutable": "/bin/bash",
-      "runtimeArgs": ["-c", "export PATH=$HOME/.npm-global/bin:$PATH && pnpm --filter studio dev --port $PORT"],
+      "runtimeArgs": ["-c", "export PATH=$HOME/.local/share/fnm/node-versions/v24.15.0/installation/bin:$PATH && cd apps/studio && npx --yes vite --port $PORT"],
       "port": 5173
     }
   ]

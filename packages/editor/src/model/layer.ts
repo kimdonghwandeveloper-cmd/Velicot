@@ -14,6 +14,8 @@ export interface CanvasModel {
   layers: LayerModel[];
   /** Full SVG string snapshot from @svgedit/svgcanvas — used for save/restore */
   svgString?: string;
+  /** Keyframe animation data — absent means no animation defined yet */
+  animation?: import('./keyframe').AnimationData;
 }
 
 export function createEmptyCanvas(

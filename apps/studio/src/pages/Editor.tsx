@@ -1,6 +1,7 @@
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useRef, useState } from 'react'
 import {
-  useSvgCanvas, useHistory, serializeModel, type CanvasModel,
+  useSvgCanvas, useHistory, serializeModel, usePlayback, applyAnimationFrame,
+  DEFAULT_ANIMATION_DATA, type CanvasModel, type AnimationData,
 } from '@velicot/editor'
 import { EditorToolbar, type EditorToolId } from '../components/EditorToolbar'
 import { LayersPanel } from '../components/LayersPanel'
@@ -20,6 +21,10 @@ export function Editor({ filename, initialModel, onBackToHome }: Props) {
   const [activeTool, setActiveTool] = useState<EditorToolId>('select')
   const [model, setModel] = useState<CanvasModel | null>(initialModel)
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null)
+  const [animation, setAnimation] = useState<AnimationData>(
+    initialModel?.animation ?? { ...DEFAULT_ANIMATION_DATA },
+  )
+  const svgRootRef = useRef<SVGSVGElement | null>(null)
 
   const handleModelChange = useCallback((m: CanvasModel) => setModel(m), [])
 
@@ -32,6 +37,32 @@ export function Editor({ filename, initialModel, onBackToHome }: Props) {
 
   const { undo, redo, canUndo } = useHistory(canvas)
 
+  const handleAnimationTick = useCallback(
+    (frameValues: Parameters<typeof applyAnimationFrame>[1]) => {
+      const svgRoot = svgRootRef.current
+        ?? containerRef.current?.querySelector<SVGSVGElement>('svg')
+        ?? null
+      if (svgRoot) {
+        svgRootRef.current = svgRoot
+        applyAnimationFrame(svgRoot, frameValues)
+      }
+    },
+    [containerRef],
+  )
+
+  const { currentTime, isPlaying, play, pause, seek } = usePlayback(
+    animation,
+    handleAnimationTick,
+  )
+
+  const handleAnimationChange = useCallback(
+    (next: AnimationData) => {
+      setAnimation(next)
+      setModel((m) => m ? { ...m, animation: next } : m)
+    },
+    [],
+  )
+
   const handleToolChange = (id: EditorToolId) => {
     setActiveTool(id)
     setTool(id as Parameters<typeof setTool>[0])
@@ -39,8 +70,7 @@ export function Editor({ filename, initialModel, onBackToHome }: Props) {
 
   const handleExport = () => {
     if (!model) return
-    // Embed the full SVG string so the file can be round-tripped back into the editor
-    const modelWithSvg = { ...model, svgString: getSvgString() }
+    const modelWithSvg = { ...model, svgString: getSvgString(), animation }
     const json = serializeModel(modelWithSvg)
     const blob = new Blob([json], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -193,7 +223,16 @@ export function Editor({ filename, initialModel, onBackToHome }: Props) {
       </div>
 
       {/* Timeline */}
-      <Timeline />
+      <Timeline
+        animation={animation}
+        onAnimationChange={handleAnimationChange}
+        currentTime={currentTime}
+        isPlaying={isPlaying}
+        onPlay={play}
+        onPause={pause}
+        onSeek={seek}
+        selectedLayerId={selectedLayerId}
+      />
     </div>
   )
 }

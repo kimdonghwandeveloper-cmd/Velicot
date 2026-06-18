@@ -12,12 +12,14 @@ export function useHistory(canvas: SvgCanvasInstance | null): UseHistoryReturn {
   const [, forceUpdate] = useState(0);
 
   const undo = useCallback(() => {
-    canvas?.undoMgr?.undo();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (canvas?.undoMgr as any)?.undo?.();
     forceUpdate((n) => n + 1);
   }, [canvas]);
 
   const redo = useCallback(() => {
-    canvas?.undoMgr?.redo();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (canvas?.undoMgr as any)?.redo?.();
     forceUpdate((n) => n + 1);
   }, [canvas]);
 
@@ -39,8 +41,10 @@ export function useHistory(canvas: SvgCanvasInstance | null): UseHistoryReturn {
     return () => window.removeEventListener('keydown', handler);
   }, [undo, redo]);
 
-  const canUndo = canvas?.undoMgr?.getUndoStackSize?.() > 0 ?? false;
-  const canRedo = canvas?.undoMgr?.getRedoStackSize?.() > 0 ?? false;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const undoMgr = canvas?.undoMgr as any;
+  const canUndo = (undoMgr?.getUndoStackSize?.() ?? 0) > 0;
+  const canRedo = (undoMgr?.getRedoStackSize?.() ?? 0) > 0;
 
   return { undo, redo, canUndo, canRedo };
 }
