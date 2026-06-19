@@ -35,12 +35,18 @@ export function useSvgCanvas({
     const container = containerRef.current;
     if (!container) return;
 
-    const svgCanvas = new SvgCanvas(container, {
-      dimensions: [width, height],
-      initFill: { color: 'FF0000', opacity: 1 },
-      initStroke: { color: '000000', opacity: 1, width: 1 },
-      initOpacity: 1,
-    });
+    let svgCanvas: SvgCanvasInstance;
+    try {
+      svgCanvas = new SvgCanvas(container, {
+        dimensions: [width, height],
+        initFill: { color: 'FF0000', opacity: 1 },
+        initStroke: { color: '000000', opacity: 1, width: 1 },
+        initOpacity: 1,
+      });
+    } catch (err) {
+      console.error('[useSvgCanvas] SvgCanvas constructor failed:', err);
+      return;
+    }
 
     canvasRef.current = svgCanvas;
     setCanvas(svgCanvas);
@@ -61,13 +67,22 @@ export function useSvgCanvas({
 
     return () => {
       canvasRef.current = null;
+      // Clear SVGEdit-injected DOM so that re-runs (React StrictMode, HMR)
+      // start with an empty container instead of accumulating stale instances.
+      container.innerHTML = '';
     };
   // onModelChange / initialSvgString intentionally excluded — callers must memoize them
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [width, height]);
 
   const setTool = (tool: ToolId) => {
-    canvasRef.current?.setMode(tool);
+    if (!canvasRef.current) return;
+    try {
+      canvasRef.current.setMode(tool);
+    } catch {
+      // SVGEdit pathActions may throw when path editing state is uninitialized
+      (canvasRef.current as unknown as { currentMode: string }).currentMode = tool;
+    }
   };
 
   const getSvgString = (): string => {

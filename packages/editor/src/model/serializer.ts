@@ -13,18 +13,28 @@ export function svgDomToModel(svgRoot: SVGSVGElement): CanvasModel {
   const width = Number(svgRoot.getAttribute('width')) || 512;
   const height = Number(svgRoot.getAttribute('height')) || 512;
 
-  const layerGroups = Array.from(
-    svgRoot.querySelectorAll<SVGGElement>(`g[${LAYER_GROUP_ATTR}]`),
-  );
+  // Support both Velicot-annotated layers and SVGEdit native g.layer groups
+  const seen = new Set<SVGGElement>();
+  const layerGroups: SVGGElement[] = [];
+  for (const g of svgRoot.querySelectorAll<SVGGElement>(`g[${LAYER_GROUP_ATTR}], g.layer`)) {
+    if (!seen.has(g)) { seen.add(g); layerGroups.push(g); }
+  }
 
-  const layers: LayerModel[] = layerGroups.map((g) => ({
-    id: g.getAttribute(LAYER_ID_ATTR) ?? g.id,
-    name: g.getAttribute(LAYER_NAME_ATTR) ?? 'Layer',
-    svgContent: g.innerHTML,
-    groupId: g.parentElement?.id ?? 'root',
-    visible: g.style.display !== 'none',
-    locked: g.getAttribute(LAYER_LOCKED_ATTR) === 'true',
-  }));
+  const layers: LayerModel[] = layerGroups.map((g, i) => {
+    // SVGEdit native layers: name is in a <title> child; no data attrs
+    const titleEl = g.querySelector('title');
+    const svgContent = titleEl
+      ? g.innerHTML.replace(titleEl.outerHTML, '').trim()
+      : g.innerHTML;
+    return {
+      id: g.getAttribute(LAYER_ID_ATTR) ?? g.id ?? `layer-${i}`,
+      name: g.getAttribute(LAYER_NAME_ATTR) ?? titleEl?.textContent ?? 'Layer',
+      svgContent,
+      groupId: g.parentElement?.id ?? 'root',
+      visible: g.style.display !== 'none',
+      locked: g.getAttribute(LAYER_LOCKED_ATTR) === 'true',
+    };
+  });
 
   return {
     version: '1.0',
