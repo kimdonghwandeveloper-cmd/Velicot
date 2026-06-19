@@ -4,6 +4,7 @@ import type {
   AnimationTrack,
   AnimatableProperty,
   EasingDef,
+  MorphOptions,
 } from '@velicot/editor'
 
 interface TimelineProps {
@@ -32,7 +33,7 @@ function formatMs(ms: number): string {
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`
 }
 
-const PROPERTY_OPTIONS: AnimatableProperty[] = ['opacity', 'transform']
+const PROPERTY_OPTIONS: AnimatableProperty[] = ['opacity', 'transform', 'path']
 
 const EASING_OPTIONS: Array<{ label: string; value: EasingDef['type'] }> = [
   { label: 'Linear', value: 'linear' },
@@ -56,6 +57,7 @@ export function Timeline({
   const [selectedKf, setSelectedKf] = useState<{ trackId: string; kfIndex: number } | null>(null)
   const [showAddTrack, setShowAddTrack] = useState(false)
   const [addTrackProp, setAddTrackProp] = useState<AnimatableProperty>('opacity')
+  const [addMorphSegLen, setAddMorphSegLen] = useState(10)
   const rulerRef = useRef<HTMLDivElement>(null)
   const draggingKf = useRef<{ trackId: string; kfIndex: number } | null>(null)
 
@@ -124,14 +126,22 @@ export function Timeline({
   const addTrack = () => {
     if (!selectedLayerId) return
     const id = `track_${selectedLayerId}_${addTrackProp}_${Date.now()}`
+    const isMorph = addTrackProp === 'path'
+    const defaultPath = 'M0,0 L10,0 L5,10 Z'
     const newTrack: AnimationTrack = {
       id,
       targetLayerId: selectedLayerId,
       property: addTrackProp,
-      keyframes: [
-        { time: 0, value: addTrackProp === 'opacity' ? 1 : 0, easing: { type: 'linear' } },
-        { time: animation.duration, value: addTrackProp === 'opacity' ? 0 : 1, easing: { type: 'linear' } },
-      ],
+      ...(isMorph && { type: 'morph', morphOptions: { maxSegmentLength: addMorphSegLen } }),
+      keyframes: isMorph
+        ? [
+            { time: 0, value: defaultPath, easing: { type: 'linear' } },
+            { time: animation.duration, value: defaultPath, easing: { type: 'linear' } },
+          ]
+        : [
+            { time: 0, value: addTrackProp === 'opacity' ? 1 : 0, easing: { type: 'linear' } },
+            { time: animation.duration, value: addTrackProp === 'opacity' ? 0 : 1, easing: { type: 'linear' } },
+          ],
     }
     onAnimationChange({ ...animation, tracks: [...animation.tracks, newTrack] })
     setShowAddTrack(false)
@@ -168,11 +178,21 @@ export function Timeline({
     onAnimationChange({ ...animation, tracks })
   }
 
-  const selectedKfData = selectedKf
-    ? animation.tracks
-        .find((t) => t.id === selectedKf.trackId)
-        ?.keyframes[selectedKf.kfIndex]
+  const selectedTrack = selectedKf
+    ? (animation.tracks.find((t) => t.id === selectedKf.trackId) ?? null)
     : null
+
+  const selectedKfData = selectedKf && selectedTrack
+    ? (selectedTrack.keyframes[selectedKf.kfIndex] ?? null)
+    : null
+
+  const updateMorphOptions = (options: MorphOptions) => {
+    if (!selectedKf) return
+    const tracks = animation.tracks.map((t) =>
+      t.id === selectedKf.trackId ? { ...t, morphOptions: { ...t.morphOptions, ...options } } : t,
+    )
+    onAnimationChange({ ...animation, tracks })
+  }
 
   const playheadX = LABEL_WIDTH + currentTime * pxPerMs
 
@@ -328,19 +348,54 @@ export function Timeline({
         }}>
           <span style={{ color: 'var(--text-2)' }}>Keyframe at {formatMs(selectedKfData.time)}</span>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-2)' }}>
-            Value
-            <input
-              value={String(selectedKfData.value)}
-              onChange={(e) => updateKfValue(e.target.value)}
-              style={{
-                width: 70, background: 'var(--bg-elevated)',
-                border: '1px solid var(--border)', color: 'var(--text-1)',
-                borderRadius: 'var(--radius-sm)', padding: '2px 6px',
-                fontFamily: 'var(--font-mono)',
-              }}
-            />
-          </label>
+          {selectedTrack?.property === 'path' ? (
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 3, color: 'var(--text-2)', fontSize: 11 }}>
+              Path (SVG d)
+              <textarea
+                value={String(selectedKfData.value)}
+                onChange={(e) => updateKfValue(e.target.value)}
+                rows={2}
+                style={{
+                  width: 240, background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border)', color: 'var(--text-1)',
+                  borderRadius: 'var(--radius-sm)', padding: '2px 6px',
+                  fontFamily: 'var(--font-mono)', fontSize: 10, resize: 'vertical',
+                }}
+              />
+            </label>
+          ) : (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-2)' }}>
+              Value
+              <input
+                value={String(selectedKfData.value)}
+                onChange={(e) => updateKfValue(e.target.value)}
+                style={{
+                  width: 70, background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border)', color: 'var(--text-1)',
+                  borderRadius: 'var(--radius-sm)', padding: '2px 6px',
+                  fontFamily: 'var(--font-mono)',
+                }}
+              />
+            </label>
+          )}
+          {selectedTrack?.type === 'morph' && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-2)', fontSize: 11 }}>
+              Seg len
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={selectedTrack.morphOptions?.maxSegmentLength ?? 10}
+                onChange={(e) => updateMorphOptions({ maxSegmentLength: Number(e.target.value) })}
+                style={{
+                  width: 48, background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border)', color: 'var(--text-1)',
+                  borderRadius: 'var(--radius-sm)', padding: '2px 4px',
+                  fontFamily: 'var(--font-mono)', fontSize: 10,
+                }}
+              />
+            </label>
+          )}
 
           <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-2)' }}>
             Easing
@@ -410,6 +465,24 @@ export function Timeline({
                 </button>
               ))}
             </div>
+            {addTrackProp === 'path' && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-2)', marginBottom: 6 }}>
+                  Morph quality — Max Segment Length: <span style={{ color: 'var(--accent-light)' }}>{addMorphSegLen}</span>
+                </div>
+                <input
+                  type="range"
+                  min={1}
+                  max={50}
+                  value={addMorphSegLen}
+                  onChange={(e) => setAddMorphSegLen(Number(e.target.value))}
+                  style={{ width: '100%' }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-3)' }}>
+                  <span>1 (smoother)</span><span>50 (faster)</span>
+                </div>
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button
                 onClick={() => setShowAddTrack(false)}

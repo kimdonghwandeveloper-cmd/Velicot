@@ -1,12 +1,15 @@
 import type { AnimationTrack } from '../model/keyframe';
 import { getEasingFn } from './easing';
+import { interpolateMorph } from '@velicot/morph';
 
 /**
  * Computes the interpolated value for a track at a given time.
  *
  * - Before first keyframe: returns first keyframe value.
  * - After last keyframe: returns last keyframe value.
- * - path/morph tracks: returns the nearest earlier keyframe value (no numeric lerp).
+ * - path tracks with type==='morph': flubber path interpolation.
+ * - path tracks without type: step (no lerp).
+ * - numeric tracks (opacity, transform): eased linear interpolation.
  */
 export function interpolateValue(
   track: AnimationTrack,
@@ -30,16 +33,24 @@ export function interpolateValue(
   const from = kfs[lo];
   const to = kfs[hi];
 
-  if (track.property === 'path' || track.type === 'morph') {
-    return from.value;
-  }
-
   const span = to.time - from.time;
   const raw = span === 0 ? 1 : (timeMs - from.time) / span;
   const easeFn = getEasingFn(from.easing);
-  const t = easeFn(Math.min(1, Math.max(0, raw)));
+  const easedT = easeFn(Math.min(1, Math.max(0, raw)));
+
+  if (track.property === 'path') {
+    if (track.type === 'morph') {
+      return interpolateMorph(
+        String(from.value),
+        String(to.value),
+        easedT,
+        track.morphOptions,
+      );
+    }
+    return from.value;
+  }
 
   const a = Number(from.value);
   const b = Number(to.value);
-  return a + (b - a) * t;
+  return a + (b - a) * easedT;
 }

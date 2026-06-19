@@ -22,12 +22,19 @@ export interface Keyframe {
   easing: EasingDef;
 }
 
+export interface MorphOptions {
+  /** Controls resampled point density. Lower = smoother. Default: 10 */
+  maxSegmentLength?: number
+}
+
 export interface AnimationTrack {
   id: string;
   targetLayerId: string;
   property: AnimatableProperty;
-  /** 'morph' reserved for Phase 3 path morphing via flubber */
+  /** 'morph' — path morphing via flubber (Phase 3) */
   type?: 'morph';
+  /** Options for morph interpolation. Only used when type === 'morph'. */
+  morphOptions?: MorphOptions;
   /** Must be sorted by time ascending */
   keyframes: Keyframe[];
 }
