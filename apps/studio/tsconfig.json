@@ -1,9 +1,17 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "@velicot/editor": ["../../packages/editor/src/index.ts"]
+    }
   },
-  "include": ["src"]
+  "include": [
+    "src",
+    "../../packages/editor/src"
+  ],
+  "exclude": [
+    "../../packages/editor/src/**/__tests__",
+    "../../packages/editor/src/**/*.test.ts"
+  ]
 }
