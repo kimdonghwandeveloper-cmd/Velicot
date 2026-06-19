@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   useSvgCanvas, useHistory, serializeModel, usePlayback, applyAnimationFrame,
   DEFAULT_ANIMATION_DATA, type CanvasModel, type AnimationData,
@@ -68,9 +68,52 @@ export function Editor({ filename, initialModel, onBackToHome }: Props) {
     [],
   )
 
+  const canvasAreaRef = useRef<HTMLDivElement>(null)
+  const panStartRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null)
+
+  // Hand/pan tool: intercept mouse events on the canvas scroll area
+  useEffect(() => {
+    const area = canvasAreaRef.current
+    if (!area) return
+    const onDown = (e: MouseEvent) => {
+      if (activeTool !== 'hand') return
+      e.preventDefault()
+      panStartRef.current = { x: e.clientX, y: e.clientY, scrollLeft: area.scrollLeft, scrollTop: area.scrollTop }
+    }
+    const onMove = (e: MouseEvent) => {
+      if (!panStartRef.current) return
+      const dx = e.clientX - panStartRef.current.x
+      const dy = e.clientY - panStartRef.current.y
+      area.scrollLeft = panStartRef.current.scrollLeft - dx
+      area.scrollTop = panStartRef.current.scrollTop - dy
+    }
+    const onUp = () => { panStartRef.current = null }
+    area.addEventListener('mousedown', onDown)
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      area.removeEventListener('mousedown', onDown)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+  }, [activeTool])
+
+  const handleAddLayer = useCallback(() => {
+    if (!canvas) return
+    const layerCount = (model?.layers.length ?? 0) + 1
+    const name = `Layer ${layerCount}`;
+    (canvas as unknown as { createLayer: (name: string) => void }).createLayer(name)
+  }, [canvas, model])
+
   const handleToolChange = (id: EditorToolId) => {
     setActiveTool(id)
-    setTool(id as Parameters<typeof setTool>[0])
+    // 'hand' is handled by our pan listener — don't pass to SVGEdit
+    if (id !== 'hand') {
+      setTool(id as Parameters<typeof setTool>[0])
+    } else {
+      // Switch SVGEdit back to select so it doesn't capture mouse events unexpectedly
+      setTool('select' as Parameters<typeof setTool>[0])
+    }
   }
 
   const handleExport = () => {
@@ -188,10 +231,11 @@ export function Editor({ filename, initialModel, onBackToHome }: Props) {
         <EditorToolbar activeTool={activeTool} onToolChange={handleToolChange} />
 
         {/* Canvas area */}
-        <div style={{
+        <div ref={canvasAreaRef} style={{
           flex: 1, background: 'var(--bg-base)', overflow: 'auto',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           position: 'relative',
+          cursor: activeTool === 'hand' ? 'grab' : 'default',
           backgroundImage: 'radial-gradient(circle, var(--border) 1px, transparent 1px)',
           backgroundSize: '24px 24px',
         }}>
@@ -232,6 +276,7 @@ export function Editor({ filename, initialModel, onBackToHome }: Props) {
         <LayersPanel
           model={model}
           selectedLayerId={selectedLayerId}
+          onAddLayer={handleAddLayer}
           onSelectLayer={(id) => {
             setSelectedLayerId(id)
             // Sync active layer to SVGEdit so new shapes go into the selected layer

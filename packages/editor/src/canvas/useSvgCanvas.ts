@@ -54,6 +54,29 @@ export function useSvgCanvas({
     canvasRef.current = svgCanvas;
     setCanvas(svgCanvas);
 
+    // SVGEdit places #svgcontent at x=W, y=H inside #svgroot (workarea centering).
+    // But #svgroot is sized to exactly match the artboard, so #svgcontent ends up
+    // outside the viewport. The selector group lives in #svgroot space and uses
+    // getBBox() (local #svgcontent coords) without adding the x/y offset — causing
+    // selection boxes to appear ~512px above/left of the actual shapes.
+    // Fix: zero out the offset so both coordinate spaces align.
+    const svgContent = container.querySelector<SVGSVGElement>('#svgcontent');
+    if (svgContent) {
+      svgContent.setAttribute('x', '0');
+      svgContent.setAttribute('y', '0');
+    }
+
+    // Patch pathActions.clear — it throws when no path is being edited (path module
+    // variable is null), which aborts the select-mode mouseup handler before
+    // showGrips(true) is reached, leaving selection handles permanently hidden.
+    const pa = (svgCanvas as unknown as { pathActions: { clear: (...a: unknown[]) => void } }).pathActions;
+    if (pa?.clear) {
+      const origClear = pa.clear.bind(pa);
+      pa.clear = (...args: unknown[]) => {
+        try { origClear(...args); } catch { /* uninitialized path state — safe to ignore */ }
+      };
+    }
+
     // Restore saved SVG if provided
     if (initialSvgString) {
       svgCanvas.setSvgString(initialSvgString);
