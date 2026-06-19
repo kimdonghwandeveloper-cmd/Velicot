@@ -70,6 +70,15 @@ export function Editor({ filename, initialModel, onBackToHome }: Props) {
 
   const handleExport = () => {
     if (!model) return
+    // Reset animation-applied styles before capturing SVG so transient
+    // playback values (opacity/transform) are not baked into the export.
+    const svgRoot = svgRootRef.current
+    if (svgRoot) {
+      svgRoot.querySelectorAll<SVGGElement>('g[data-layer-id]').forEach((g) => {
+        g.style.opacity = ''
+        g.removeAttribute('transform')
+      })
+    }
     const modelWithSvg = { ...model, svgString: getSvgString(), animation }
     const json = serializeModel(modelWithSvg)
     const blob = new Blob([json], { type: 'application/json' })

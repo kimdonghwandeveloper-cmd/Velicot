@@ -21,16 +21,18 @@ const LABEL_WIDTH = 140
 const PX_PER_MS_DEFAULT = 0.3
 
 function formatTime(ms: number): string {
-  const s = Math.floor(ms / 1000)
+  const totalSeconds = Math.floor(ms / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
   const remaining = Math.floor(ms % 1000)
-  return `${s}:${String(Math.floor(ms / 1000 * 60) % 60).padStart(2, '0')}.${String(remaining).padStart(3, '0')}`
+  return `${minutes}:${String(seconds).padStart(2, '0')}.${String(remaining).padStart(3, '0')}`
 }
 
 function formatMs(ms: number): string {
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`
 }
 
-const PROPERTY_OPTIONS: AnimatableProperty[] = ['opacity', 'transform', 'path']
+const PROPERTY_OPTIONS: AnimatableProperty[] = ['opacity', 'transform']
 
 const EASING_OPTIONS: Array<{ label: string; value: EasingDef['type'] }> = [
   { label: 'Linear', value: 'linear' },
@@ -65,7 +67,8 @@ export function Timeline({
       const rect = rulerRef.current?.getBoundingClientRect()
       if (!rect) return
       const seek = (clientX: number) => {
-        const x = clientX - rect.left - LABEL_WIDTH
+        const scrollX = rulerRef.current?.scrollLeft ?? 0
+        const x = clientX - rect.left - LABEL_WIDTH + scrollX
         const ms = Math.max(0, Math.min(animation.duration, x / pxPerMs))
         onSeek(ms)
       }
@@ -91,14 +94,19 @@ export function Timeline({
       if (!rect) return
       const onMove = (ev: PointerEvent) => {
         if (!draggingKf.current) return
-        const x = ev.clientX - rect.left - LABEL_WIDTH
+        const scrollX = rulerRef.current?.scrollLeft ?? 0
+        const x = ev.clientX - rect.left - LABEL_WIDTH + scrollX
         const ms = Math.max(0, Math.min(animation.duration, x / pxPerMs))
         const tracks = animation.tracks.map((t) => {
           if (t.id !== trackId) return t
-          const kfs = t.keyframes.map((kf, i) =>
-            i === kfIndex ? { ...kf, time: Math.round(ms) } : kf,
-          )
-          return { ...t, keyframes: [...kfs].sort((a, b) => a.time - b.time) }
+          const moved = { ...t.keyframes[draggingKf.current!.kfIndex], time: Math.round(ms) }
+          const sorted = t.keyframes
+            .map((kf, i) => (i === draggingKf.current!.kfIndex ? moved : kf))
+            .sort((a, b) => a.time - b.time)
+          const newIndex = sorted.indexOf(moved)
+          draggingKf.current = { trackId, kfIndex: newIndex }
+          setSelectedKf({ trackId, kfIndex: newIndex })
+          return { ...t, keyframes: sorted }
         })
         onAnimationChange({ ...animation, tracks })
       }
