@@ -26,8 +26,19 @@ export function svgDomToModel(svgRoot: SVGSVGElement): CanvasModel {
     const svgContent = titleEl
       ? g.innerHTML.replace(titleEl.outerHTML, '').trim()
       : g.innerHTML;
+
+    // Assign stable ID: prefer existing data-layer-id, fall back to non-empty g.id, else generate
+    const existingId = g.getAttribute(LAYER_ID_ATTR) ?? (g.id || null);
+    const id = existingId ?? `layer-${i}`;
+
+    // Annotate SVGEdit-native layers so applyAnimationFrame can find them by data-layer-id
+    if (!g.getAttribute(LAYER_ID_ATTR)) {
+      g.setAttribute(LAYER_ID_ATTR, id);
+      g.setAttribute(LAYER_GROUP_ATTR, '');
+    }
+
     return {
-      id: g.getAttribute(LAYER_ID_ATTR) ?? g.id ?? `layer-${i}`,
+      id,
       name: g.getAttribute(LAYER_NAME_ATTR) ?? titleEl?.textContent ?? 'Layer',
       svgContent,
       groupId: g.parentElement?.id ?? 'root',

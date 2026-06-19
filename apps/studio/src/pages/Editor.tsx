@@ -28,11 +28,16 @@ export function Editor({ filename, initialModel, onBackToHome }: Props) {
 
   const handleModelChange = useCallback((m: CanvasModel) => setModel(m), [])
 
+  const handleLayerSelect = useCallback((layerId: string) => {
+    setSelectedLayerId(layerId)
+  }, [])
+
   const { containerRef, canvas, setTool, getSvgString } = useSvgCanvas({
     width: initialModel?.canvas.width ?? 512,
     height: initialModel?.canvas.height ?? 512,
     initialSvgString: initialModel?.svgString,
     onModelChange: handleModelChange,
+    onLayerSelect: handleLayerSelect,
   })
 
   const { undo, redo, canUndo } = useHistory(canvas)
@@ -227,7 +232,16 @@ export function Editor({ filename, initialModel, onBackToHome }: Props) {
         <LayersPanel
           model={model}
           selectedLayerId={selectedLayerId}
-          onSelectLayer={setSelectedLayerId}
+          onSelectLayer={(id) => {
+            setSelectedLayerId(id)
+            // Sync active layer to SVGEdit so new shapes go into the selected layer
+            const layer = model?.layers.find((l) => l.id === id)
+            if (layer && canvas) {
+              try {
+                (canvas as unknown as { setCurrentLayer: (name: string) => void }).setCurrentLayer(layer.name)
+              } catch { /* SVGEdit may not support this in all versions */ }
+            }
+          }}
         />
       </div>
 

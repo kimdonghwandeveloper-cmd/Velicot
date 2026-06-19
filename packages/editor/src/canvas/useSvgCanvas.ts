@@ -12,6 +12,8 @@ interface UseSvgCanvasOptions {
   /** Initial SVG string to load (from a previously saved CanvasModel.svgString) */
   initialSvgString?: string;
   onModelChange?: (model: CanvasModel) => void;
+  /** Called when the user selects an element on canvas; receives the layer id */
+  onLayerSelect?: (layerId: string) => void;
 }
 
 interface UseSvgCanvasReturn {
@@ -26,6 +28,7 @@ export function useSvgCanvas({
   height = 512,
   initialSvgString,
   onModelChange,
+  onLayerSelect,
 }: UseSvgCanvasOptions = {}): UseSvgCanvasReturn {
   const containerRef = useRef<HTMLDivElement>(null);
   const [canvas, setCanvas] = useState<SvgCanvasInstance | null>(null);
@@ -63,6 +66,30 @@ export function useSvgCanvas({
           onModelChange(svgDomToModel(svgRoot));
         }
       });
+    }
+
+    if (onLayerSelect) {
+      // SVGEdit has no "element selected" event — poll on mouseup instead.
+      // After any click on the canvas, check getSelectedElements() and walk
+      // up to the nearest g[data-layer-id] to determine which layer was clicked.
+      const handleMouseUp = () => {
+        // Defer one tick so SVGEdit finishes updating selectedElements
+        // before we read it.
+        setTimeout(() => {
+          const selectedEls: Element[] = (
+            svgCanvas as unknown as { getSelectedElements: () => Element[] }
+          ).getSelectedElements().filter(Boolean);
+          const el = selectedEls[0];
+          if (!el) return;
+          let node: Element | null = el;
+          while (node) {
+            const layerId = node.getAttribute('data-layer-id');
+            if (layerId) { onLayerSelect(layerId); return; }
+            node = node.parentElement;
+          }
+        }, 0);
+      };
+      container.addEventListener('mouseup', handleMouseUp);
     }
 
     return () => {
