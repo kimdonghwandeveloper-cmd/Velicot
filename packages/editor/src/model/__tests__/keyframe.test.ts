@@ -90,6 +90,37 @@ describe('interpolateValue', () => {
     const track = makeOpacityTrack([]);
     expect(interpolateValue(track, 500)).toBe(0);
   });
+
+  it('returns from.value instead of NaN when value is invalid string', () => {
+    const track = makeOpacityTrack([
+      { time: 0, value: 'invalid' as unknown as number, easing: LINEAR_EASING },
+      { time: 1000, value: 1, easing: LINEAR_EASING },
+    ]);
+    const result = interpolateValue(track, 500);
+    expect(result).not.toBeNaN();
+    expect(result).toBe('invalid');
+  });
+
+  it('handles keyframes with duplicate time values', () => {
+    const track = makeOpacityTrack([
+      { time: 500, value: 0.2, easing: LINEAR_EASING },
+      { time: 500, value: 0.8, easing: LINEAR_EASING },
+    ]);
+    expect(() => interpolateValue(track, 500)).not.toThrow();
+  });
+
+  it('works with translateX track', () => {
+    const track: AnimationTrack = {
+      id: 'tx',
+      targetLayerId: 'layer-1',
+      property: 'translateX',
+      keyframes: [
+        { time: 0, value: 0, easing: LINEAR_EASING },
+        { time: 1000, value: 200, easing: LINEAR_EASING },
+      ],
+    };
+    expect(interpolateValue(track, 500)).toBeCloseTo(100);
+  });
 });
 
 describe('getEasingFn', () => {
@@ -112,5 +143,16 @@ describe('getEasingFn', () => {
     expect(fn(1)).toBeCloseTo(1, 2);
     // at midpoint, cubicBezier ease-in-out ≈ 0.5
     expect(fn(0.5)).toBeCloseTo(0.5, 1);
+  });
+
+  it('cubicBezier falls back to default params when none provided', () => {
+    const fn = getEasingFn({ type: 'cubicBezier' });
+    expect(fn(0)).toBeCloseTo(0, 2);
+    expect(fn(1)).toBeCloseTo(1, 2);
+  });
+
+  it('unknown easing type falls back to linear', () => {
+    const fn = getEasingFn({ type: 'unknown' as never });
+    expect(fn(0.5)).toBeCloseTo(0.5);
   });
 });

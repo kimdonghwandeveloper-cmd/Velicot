@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   useSvgCanvas, useHistory, serializeModel, usePlayback, applyAnimationFrame,
   DEFAULT_ANIMATION_DATA, type CanvasModel, type AnimationData,
@@ -36,6 +36,12 @@ export function Editor({ filename, initialModel, onBackToHome }: Props) {
   })
 
   const { undo, redo, canUndo } = useHistory(canvas)
+
+  // Eagerly populate svgRootRef so export reset works even without prior playback.
+  useEffect(() => {
+    const svg = containerRef.current?.querySelector<SVGSVGElement>('svg')
+    if (svg) svgRootRef.current = svg
+  })
 
   const handleAnimationTick = useCallback(
     (frameValues: Parameters<typeof applyAnimationFrame>[1]) => {

@@ -51,7 +51,20 @@ export function usePlayback(
     (wallNow: number) => {
       if (!animation) return;
       const elapsed = wallNow - startWallRef.current;
-      const t = Math.min(startTimeRef.current + elapsed, animation.duration);
+      const raw = startTimeRef.current + elapsed;
+      const shouldLoop = animation.loop !== false;
+
+      if (raw >= animation.duration && shouldLoop) {
+        // Restart: reset wall clock reference so elapsed resets from 0.
+        startWallRef.current = wallNow;
+        startTimeRef.current = 0;
+        setCurrentTime(0);
+        computeFrame(0);
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      const t = Math.min(raw, animation.duration);
       setCurrentTime(t);
       computeFrame(t);
       if (t < animation.duration) {
