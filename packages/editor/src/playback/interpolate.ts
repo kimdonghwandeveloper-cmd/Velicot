@@ -41,5 +41,6 @@ export function interpolateValue(
 
   const a = Number(from.value);
   const b = Number(to.value);
+  if (Number.isNaN(a) || Number.isNaN(b)) return from.value;
   return a + (b - a) * t;
 }
