@@ -41,7 +41,20 @@ export function Home({ onOpenEditor }: Props) {
   const [recents, setRecents] = useState<RecentFile[]>(loadRecents)
   const [activeNav, setActiveNav] = useState<string>('Home')
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showAll, setShowAll] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const filteredRecents = recents.filter((f) =>
+    f.filename.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+  const displayedRecents = showAll ? filteredRecents : filteredRecents.slice(0, 6)
+
+  const handleNavChange = (label: string) => {
+    setActiveNav(label)
+    setSearchQuery('')
+    setShowAll(false)
+  }
 
   const handleCreate = (model: CanvasModel, filename: string) => {
     setShowNewFile(false)
@@ -160,7 +173,7 @@ export function Home({ onOpenEditor }: Props) {
               key={label}
               icon={icon} label={label}
               active={activeNav === label}
-              onClick={() => setActiveNav(label)}
+              onClick={() => handleNavChange(label)}
             />
           ))}
 
@@ -192,38 +205,86 @@ export function Home({ onOpenEditor }: Props) {
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             }}>
               <span>{loadError}</span>
-              <button
-                onClick={() => setLoadError(null)}
-                style={{ background: 'none', color: '#f87171', fontSize: 14 }}
-              >✕</button>
+              <button onClick={() => setLoadError(null)} style={{ background: 'none', color: '#f87171', fontSize: 14 }}>✕</button>
             </div>
           )}
 
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            marginBottom: 20,
-          }}>
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-1)' }}>Recents</h1>
-            <button style={{
-              background: 'none', color: 'var(--accent-light)',
-              fontSize: 13, display: 'flex', alignItems: 'center', gap: 4,
-            }}>
-              View all →
-            </button>
-          </div>
-
-          {recents.length === 0 ? (
-            <EmptyState onNewFile={() => setShowNewFile(true)} />
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 520 }}>
-              {recents.map((f) => (
-                <FileCard
-                  key={f.filename + f.timestamp}
-                  file={f}
-                  onClick={() => handleOpenFile(f)}
+          {/* Search view */}
+          {activeNav === 'Search' && (
+            <>
+              <div style={{ marginBottom: 20 }}>
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Search files..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    width: '100%', maxWidth: 480, padding: '8px 14px',
+                    background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-sm)', color: 'var(--text-1)', fontSize: 13,
+                    outline: 'none',
+                  }}
                 />
-              ))}
+              </div>
+              {searchQuery === '' ? (
+                <p style={{ color: 'var(--text-3)', fontSize: 13 }}>Start typing to search your files.</p>
+              ) : filteredRecents.length === 0 ? (
+                <p style={{ color: 'var(--text-3)', fontSize: 13 }}>No files matching "{searchQuery}"</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 520 }}>
+                  {filteredRecents.map((f) => (
+                    <FileCard key={f.filename + f.timestamp} file={f} onClick={() => handleOpenFile(f)} />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Shared with me view */}
+          {activeNav === 'Shared with me' && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '60px 0', gap: 12 }}>
+              <div style={{ fontSize: 36, opacity: 0.2 }}>👥</div>
+              <div style={{ color: 'var(--text-2)', fontSize: 14 }}>No shared files</div>
+              <div style={{ color: 'var(--text-3)', fontSize: 12 }}>Sharing is not available in this version.</div>
             </div>
+          )}
+
+          {/* Home / Recents view */}
+          {(activeNav === 'Home' || activeNav === 'Recents') && (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-1)' }}>
+                  {activeNav === 'Recents' ? 'Recents' : 'Recents'}
+                </h1>
+                {filteredRecents.length > 6 && !showAll && (
+                  <button
+                    onClick={() => setShowAll(true)}
+                    style={{ background: 'none', color: 'var(--accent-light)', fontSize: 13 }}
+                  >
+                    View all ({filteredRecents.length}) →
+                  </button>
+                )}
+                {showAll && (
+                  <button
+                    onClick={() => setShowAll(false)}
+                    style={{ background: 'none', color: 'var(--accent-light)', fontSize: 13 }}
+                  >
+                    ← Show less
+                  </button>
+                )}
+              </div>
+
+              {displayedRecents.length === 0 ? (
+                <EmptyState onNewFile={() => setShowNewFile(true)} />
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 520 }}>
+                  {displayedRecents.map((f) => (
+                    <FileCard key={f.filename + f.timestamp} file={f} onClick={() => handleOpenFile(f)} />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </main>
       </div>

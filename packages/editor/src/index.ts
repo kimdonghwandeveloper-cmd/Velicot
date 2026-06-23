@@ -20,4 +20,5 @@ export type {
   Keyframe,
   EasingDef,
   EasingType,
+  MorphOptions,
 } from './model/keyframe';

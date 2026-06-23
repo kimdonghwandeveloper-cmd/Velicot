@@ -5,9 +5,10 @@ interface Props {
   model: CanvasModel | null
   selectedLayerId: string | null
   onSelectLayer: (id: string) => void
+  onAddLayer?: () => void
 }
 
-export function LayersPanel({ model, selectedLayerId, onSelectLayer }: Props) {
+export function LayersPanel({ model, selectedLayerId, onSelectLayer, onAddLayer }: Props) {
   const [tab, setTab] = useState<'layers' | 'properties'>('layers')
 
   return (
@@ -42,7 +43,7 @@ export function LayersPanel({ model, selectedLayerId, onSelectLayer }: Props) {
       </div>
 
       {tab === 'layers' ? (
-        <LayersTab model={model} selectedId={selectedLayerId} onSelect={onSelectLayer} />
+        <LayersTab model={model} selectedId={selectedLayerId} onSelect={onSelectLayer} onAddLayer={onAddLayer} />
       ) : (
         <PropertiesTab selectedId={selectedLayerId} model={model} />
       )}
@@ -50,10 +51,11 @@ export function LayersPanel({ model, selectedLayerId, onSelectLayer }: Props) {
   )
 }
 
-function LayersTab({ model, selectedId, onSelect }: {
+function LayersTab({ model, selectedId, onSelect, onAddLayer }: {
   model: CanvasModel | null
   selectedId: string | null
   onSelect: (id: string) => void
+  onAddLayer?: () => void
 }) {
   const layers = model?.layers ?? []
 
@@ -68,6 +70,7 @@ function LayersTab({ model, selectedId, onSelect }: {
         </span>
         <button
           title="Add layer"
+          onClick={onAddLayer}
           style={{
             width: 22, height: 22, borderRadius: 'var(--radius-sm)',
             background: 'var(--bg-overlay)', color: 'var(--text-2)',

@@ -1,0 +1,11 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`interpolateMorph > snapshots morph at key t values 1`] = `"M0,0 L10,0 L5,10 Z"`;
+
+exports[`interpolateMorph > snapshots morph at key t values 2`] = `"M0,0L10,0L8.125,6.25L6.25,10L1.875,6.25Z"`;
+
+exports[`interpolateMorph > snapshots morph at key t values 3`] = `"M0,0L10,0L8.75,7.5L7.5,10L1.25,7.5Z"`;
+
+exports[`interpolateMorph > snapshots morph at key t values 4`] = `"M0,0L10,0L9.375,8.75L8.75,10L0.625,8.75Z"`;
+
+exports[`interpolateMorph > snapshots morph at key t values 5`] = `"M0,0 L10,0 L10,10 L0,10 Z"`;
