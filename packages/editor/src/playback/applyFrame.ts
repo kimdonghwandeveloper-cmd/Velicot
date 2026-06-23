@@ -15,11 +15,21 @@ export function applyAnimationFrame(
     if (!g) return;
 
     if (props.opacity !== undefined) {
-      g.style.opacity = String(props.opacity);
+      const clamped = Math.min(1, Math.max(0, Number(props.opacity)));
+      g.style.opacity = String(clamped);
     }
 
-    if (props.transform !== undefined) {
-      g.setAttribute('transform', String(props.transform));
+    const hasTransform =
+      props.translateX !== undefined ||
+      props.translateY !== undefined ||
+      props.rotate !== undefined ||
+      props.scale !== undefined;
+    if (hasTransform) {
+      const tx = Number(props.translateX ?? 0);
+      const ty = Number(props.translateY ?? 0);
+      const r = Number(props.rotate ?? 0);
+      const s = Number(props.scale ?? 1);
+      g.setAttribute('transform', `translate(${tx}, ${ty}) rotate(${r}) scale(${s})`);
     }
 
     if (props.path !== undefined) {
