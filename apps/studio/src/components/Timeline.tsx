@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  interpolateValue,
-  type AnimationData,
-  type AnimationTrack,
-  type AnimatableProperty,
-  type EasingDef,
+import React, { useCallback, useRef, useState } from 'react'
+import type {
+  AnimationData,
+  AnimationTrack,
+  AnimatableProperty,
+  EasingDef,
+  MorphOptions,
 } from '@velicot/editor'
 
 interface TimelineProps {
@@ -33,29 +33,7 @@ function formatMs(ms: number): string {
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`
 }
 
-const PROPERTY_OPTIONS: AnimatableProperty[] = [
-  'opacity',
-  'translateX',
-  'translateY',
-  'rotate',
-  'scale',
-]
-
-/** Default keyframe value for a property at track-creation / keyframe-insert time. */
-function defaultValueFor(prop: AnimatableProperty): number {
-  switch (prop) {
-    case 'opacity':
-    case 'scale':
-      return 1
-    default:
-      return 0
-  }
-}
-
-/** Property whose numeric input should be range-limited to [0,1]. */
-function isUnitRange(prop: AnimatableProperty): boolean {
-  return prop === 'opacity'
-}
+const PROPERTY_OPTIONS: AnimatableProperty[] = ['opacity', 'transform', 'path']
 
 const EASING_OPTIONS: Array<{ label: string; value: EasingDef['type'] }> = [
   { label: 'Linear', value: 'linear' },
@@ -79,12 +57,11 @@ export function Timeline({
   const [selectedKf, setSelectedKf] = useState<{ trackId: string; kfIndex: number } | null>(null)
   const [showAddTrack, setShowAddTrack] = useState(false)
   const [addTrackProp, setAddTrackProp] = useState<AnimatableProperty>('opacity')
-  const [editingDuration, setEditingDuration] = useState(false)
+  const [addMorphSegLen, setAddMorphSegLen] = useState(10)
   const rulerRef = useRef<HTMLDivElement>(null)
   const draggingKf = useRef<{ trackId: string; kfIndex: number } | null>(null)
 
   const totalWidth = animation.duration * pxPerMs
-  const loopEnabled = animation.loop !== false
 
   // Scrub on ruler click/drag
   const handleRulerPointerDown = useCallback(
@@ -149,16 +126,22 @@ export function Timeline({
   const addTrack = () => {
     if (!selectedLayerId) return
     const id = `track_${selectedLayerId}_${addTrackProp}_${Date.now()}`
-    const start = defaultValueFor(addTrackProp)
-    const end = addTrackProp === 'opacity' ? 0 : addTrackProp === 'scale' ? 1.5 : 100
+    const isMorph = addTrackProp === 'path'
+    const defaultPath = 'M0,0 L10,0 L5,10 Z'
     const newTrack: AnimationTrack = {
       id,
       targetLayerId: selectedLayerId,
       property: addTrackProp,
-      keyframes: [
-        { time: 0, value: start, easing: { type: 'linear' } },
-        { time: animation.duration, value: end, easing: { type: 'linear' } },
-      ],
+      ...(isMorph && { type: 'morph', morphOptions: { maxSegmentLength: addMorphSegLen } }),
+      keyframes: isMorph
+        ? [
+            { time: 0, value: defaultPath, easing: { type: 'linear' } },
+            { time: animation.duration, value: defaultPath, easing: { type: 'linear' } },
+          ]
+        : [
+            { time: 0, value: addTrackProp === 'opacity' ? 1 : 0, easing: { type: 'linear' } },
+            { time: animation.duration, value: addTrackProp === 'opacity' ? 0 : 1, easing: { type: 'linear' } },
+          ],
     }
     onAnimationChange({ ...animation, tracks: [...animation.tracks, newTrack] })
     setShowAddTrack(false)
@@ -168,60 +151,6 @@ export function Timeline({
     onAnimationChange({ ...animation, tracks: animation.tracks.filter((t) => t.id !== trackId) })
     if (selectedKf?.trackId === trackId) setSelectedKf(null)
   }
-
-  // Insert a keyframe on a track by clicking the track background.
-  const handleTrackClick = useCallback(
-    (e: React.MouseEvent, trackId: string) => {
-      const rect = rulerRef.current?.getBoundingClientRect()
-      if (!rect) return
-      const scrollX = rulerRef.current?.scrollLeft ?? 0
-      const x = e.clientX - rect.left - LABEL_WIDTH + scrollX
-      const ms = Math.round(Math.max(0, Math.min(animation.duration, x / pxPerMs)))
-      const tracks = animation.tracks.map((t) => {
-        if (t.id !== trackId) return t
-        // Skip if a keyframe already exists very close to this time.
-        if (t.keyframes.some((kf) => Math.abs(kf.time - ms) < 8)) return t
-        const value = interpolateValue(t, ms)
-        const newKf = { time: ms, value, easing: { type: 'linear' as const } }
-        const sorted = [...t.keyframes, newKf].sort((a, b) => a.time - b.time)
-        setSelectedKf({ trackId, kfIndex: sorted.indexOf(newKf) })
-        return { ...t, keyframes: sorted }
-      })
-      onAnimationChange({ ...animation, tracks })
-    },
-    [animation, pxPerMs, onAnimationChange],
-  )
-
-  const deleteKeyframe = useCallback(
-    (trackId: string, kfIndex: number) => {
-      const track = animation.tracks.find((t) => t.id === trackId)
-      if (!track || track.keyframes.length <= 1) return // keep at least 1
-      const tracks = animation.tracks.map((t) =>
-        t.id === trackId
-          ? { ...t, keyframes: t.keyframes.filter((_, i) => i !== kfIndex) }
-          : t,
-      )
-      onAnimationChange({ ...animation, tracks })
-      setSelectedKf(null)
-    },
-    [animation, onAnimationChange],
-  )
-
-  // Delete / Backspace removes the selected keyframe.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (!selectedKf) return
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        const target = e.target as HTMLElement | null
-        // Don't hijack the key while typing in an input/select.
-        if (target && (target.tagName === 'INPUT' || target.tagName === 'SELECT')) return
-        e.preventDefault()
-        deleteKeyframe(selectedKf.trackId, selectedKf.kfIndex)
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [selectedKf, deleteKeyframe])
 
   const updateKfEasing = (easing: EasingDef) => {
     if (!selectedKf) return
@@ -249,38 +178,21 @@ export function Timeline({
     onAnimationChange({ ...animation, tracks })
   }
 
-  const updateKfTime = (raw: string) => {
+  const selectedTrack = selectedKf
+    ? (animation.tracks.find((t) => t.id === selectedKf.trackId) ?? null)
+    : null
+
+  const selectedKfData = selectedKf && selectedTrack
+    ? (selectedTrack.keyframes[selectedKf.kfIndex] ?? null)
+    : null
+
+  const updateMorphOptions = (options: MorphOptions) => {
     if (!selectedKf) return
-    const parsed = Math.round(parseFloat(raw))
-    if (isNaN(parsed)) return
-    const clamped = Math.max(0, Math.min(animation.duration, parsed))
-    const tracks = animation.tracks.map((t) => {
-      if (t.id !== selectedKf.trackId) return t
-      const moved = { ...t.keyframes[selectedKf.kfIndex], time: clamped }
-      const sorted = t.keyframes
-        .map((kf, i) => (i === selectedKf.kfIndex ? moved : kf))
-        .sort((a, b) => a.time - b.time)
-      setSelectedKf({ trackId: selectedKf.trackId, kfIndex: sorted.indexOf(moved) })
-      return { ...t, keyframes: sorted }
-    })
+    const tracks = animation.tracks.map((t) =>
+      t.id === selectedKf.trackId ? { ...t, morphOptions: { ...t.morphOptions, ...options } } : t,
+    )
     onAnimationChange({ ...animation, tracks })
   }
-
-  const commitDuration = (raw: string) => {
-    setEditingDuration(false)
-    const parsed = Math.round(parseFloat(raw))
-    if (isNaN(parsed) || parsed < 1) return
-    onAnimationChange({ ...animation, duration: parsed })
-  }
-
-  const toggleLoop = () => {
-    onAnimationChange({ ...animation, loop: !loopEnabled })
-  }
-
-  const selectedTrack = selectedKf
-    ? animation.tracks.find((t) => t.id === selectedKf.trackId)
-    : undefined
-  const selectedKfData = selectedKf ? selectedTrack?.keyframes[selectedKf.kfIndex] ?? null : null
 
   const playheadX = LABEL_WIDTH + currentTime * pxPerMs
 
@@ -302,51 +214,14 @@ export function Timeline({
           {isPlaying ? '⏸' : '▶'}
         </button>
         <PlayBtn icon="⏭" title="Go to end" onClick={() => onSeek(animation.duration)} />
-        <button
-          title={loopEnabled ? 'Loop: on' : 'Loop: off'}
-          onClick={toggleLoop}
-          style={{
-            width: 26, height: 26, borderRadius: 'var(--radius-sm)',
-            background: loopEnabled ? 'rgba(124,58,237,0.2)' : 'transparent',
-            color: loopEnabled ? 'var(--accent-light)' : 'var(--text-3)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 14,
-          }}
-        >
-          ⟳
-        </button>
 
         <span style={{ color: 'var(--accent-light)', fontFamily: 'var(--font-mono)', fontSize: 12, marginLeft: 4 }}>
           {formatTime(currentTime)}
         </span>
         <span style={{ color: 'var(--text-3)', fontSize: 11 }}>/</span>
-        {editingDuration ? (
-          <input
-            type="number"
-            min={1}
-            autoFocus
-            defaultValue={animation.duration}
-            onBlur={(e) => commitDuration(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') commitDuration((e.target as HTMLInputElement).value)
-              if (e.key === 'Escape') setEditingDuration(false)
-            }}
-            style={{
-              width: 64, background: 'var(--bg-elevated)',
-              border: '1px solid var(--border)', color: 'var(--text-1)',
-              borderRadius: 'var(--radius-sm)', padding: '1px 4px',
-              fontFamily: 'var(--font-mono)', fontSize: 11,
-            }}
-          />
-        ) : (
-          <span
-            title="Click to edit duration (ms)"
-            onClick={() => setEditingDuration(true)}
-            style={{ color: 'var(--text-2)', fontFamily: 'var(--font-mono)', fontSize: 11, cursor: 'text' }}
-          >
-            {formatTime(animation.duration)}
-          </span>
-        )}
+        <span style={{ color: 'var(--text-2)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+          {formatTime(animation.duration)}
+        </span>
 
         <div style={{ flex: 1 }} />
         <span style={{ color: 'var(--text-2)', fontSize: 11 }}>{animation.fps} fps</span>
@@ -427,24 +302,15 @@ export function Timeline({
                   >×</button>
                 </div>
 
-                {/* Track area — click empty space to insert a keyframe */}
-                <div
-                  style={{ position: 'relative', flex: 1, height: '100%', cursor: 'copy' }}
-                  onClick={(e) => handleTrackClick(e, track.id)}
-                  title="Click to add a keyframe"
-                >
+                {/* Track area */}
+                <div style={{ position: 'relative', flex: 1, height: '100%' }}>
                   {track.keyframes.map((kf, kfIdx) => {
                     const isSelected = selectedKf?.trackId === track.id && selectedKf.kfIndex === kfIdx
                     return (
                       <div
                         key={kfIdx}
                         onPointerDown={(e) => handleKfPointerDown(e, track.id, kfIdx)}
-                        onClick={(e) => e.stopPropagation()}
-                        onContextMenu={(e) => {
-                          e.preventDefault()
-                          deleteKeyframe(track.id, kfIdx)
-                        }}
-                        title={`t=${formatMs(kf.time)} val=${kf.value} (right-click to delete)`}
+                        title={`t=${formatMs(kf.time)} val=${kf.value}`}
                         style={{
                           position: 'absolute',
                           left: kf.time * pxPerMs - 5,
@@ -474,46 +340,62 @@ export function Timeline({
       </div>
 
       {/* Keyframe editor panel */}
-      {selectedKfData && selectedTrack && (
+      {selectedKfData && (
         <div style={{
           borderTop: '1px solid var(--border-light)',
           padding: '6px 12px',
           display: 'flex', alignItems: 'center', gap: 16, fontSize: 11,
         }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-2)' }}>
-            Time (ms)
-            <input
-              type="number"
-              min={0}
-              max={animation.duration}
-              value={selectedKfData.time}
-              onChange={(e) => updateKfTime(e.target.value)}
-              style={{
-                width: 70, background: 'var(--bg-elevated)',
-                border: '1px solid var(--border)', color: 'var(--text-1)',
-                borderRadius: 'var(--radius-sm)', padding: '2px 6px',
-                fontFamily: 'var(--font-mono)',
-              }}
-            />
-          </label>
+          <span style={{ color: 'var(--text-2)' }}>Keyframe at {formatMs(selectedKfData.time)}</span>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-2)' }}>
-            Value
-            <input
-              type="number"
-              step={isUnitRange(selectedTrack.property) ? 0.05 : 1}
-              min={isUnitRange(selectedTrack.property) ? 0 : undefined}
-              max={isUnitRange(selectedTrack.property) ? 1 : undefined}
-              value={String(selectedKfData.value)}
-              onChange={(e) => updateKfValue(e.target.value)}
-              style={{
-                width: 70, background: 'var(--bg-elevated)',
-                border: '1px solid var(--border)', color: 'var(--text-1)',
-                borderRadius: 'var(--radius-sm)', padding: '2px 6px',
-                fontFamily: 'var(--font-mono)',
-              }}
-            />
-          </label>
+          {selectedTrack?.property === 'path' ? (
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 3, color: 'var(--text-2)', fontSize: 11 }}>
+              Path (SVG d)
+              <textarea
+                value={String(selectedKfData.value)}
+                onChange={(e) => updateKfValue(e.target.value)}
+                rows={2}
+                style={{
+                  width: 240, background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border)', color: 'var(--text-1)',
+                  borderRadius: 'var(--radius-sm)', padding: '2px 6px',
+                  fontFamily: 'var(--font-mono)', fontSize: 10, resize: 'vertical',
+                }}
+              />
+            </label>
+          ) : (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-2)' }}>
+              Value
+              <input
+                value={String(selectedKfData.value)}
+                onChange={(e) => updateKfValue(e.target.value)}
+                style={{
+                  width: 70, background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border)', color: 'var(--text-1)',
+                  borderRadius: 'var(--radius-sm)', padding: '2px 6px',
+                  fontFamily: 'var(--font-mono)',
+                }}
+              />
+            </label>
+          )}
+          {selectedTrack?.type === 'morph' && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-2)', fontSize: 11 }}>
+              Seg len
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={selectedTrack.morphOptions?.maxSegmentLength ?? 10}
+                onChange={(e) => updateMorphOptions({ maxSegmentLength: Number(e.target.value) })}
+                style={{
+                  width: 48, background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border)', color: 'var(--text-1)',
+                  borderRadius: 'var(--radius-sm)', padding: '2px 4px',
+                  fontFamily: 'var(--font-mono)', fontSize: 10,
+                }}
+              />
+            </label>
+          )}
 
           <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-2)' }}>
             Easing
@@ -565,7 +447,7 @@ export function Timeline({
               Layer: <span style={{ color: 'var(--accent-light)' }}>{selectedLayerId}</span>
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-2)', marginBottom: 8 }}>Property</div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
               {PROPERTY_OPTIONS.map((p) => (
                 <button
                   key={p}
@@ -583,6 +465,24 @@ export function Timeline({
                 </button>
               ))}
             </div>
+            {addTrackProp === 'path' && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-2)', marginBottom: 6 }}>
+                  Morph quality — Max Segment Length: <span style={{ color: 'var(--accent-light)' }}>{addMorphSegLen}</span>
+                </div>
+                <input
+                  type="range"
+                  min={1}
+                  max={50}
+                  value={addMorphSegLen}
+                  onChange={(e) => setAddMorphSegLen(Number(e.target.value))}
+                  style={{ width: '100%' }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-3)' }}>
+                  <span>1 (smoother)</span><span>50 (faster)</span>
+                </div>
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button
                 onClick={() => setShowAddTrack(false)}

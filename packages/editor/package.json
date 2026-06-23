@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@svgedit/svgcanvas": "^7.3.10",
+    "@velicot/morph": "workspace:*",
     "d3-ease": "^3.0.1"
   },
   "devDependencies": {

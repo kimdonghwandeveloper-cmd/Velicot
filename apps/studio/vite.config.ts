@@ -7,7 +7,11 @@ export default defineConfig({
   resolve: {
     alias: {
       '@velicot/editor': resolve(__dirname, '../../packages/editor/src/index.ts'),
+      '@velicot/morph': resolve(__dirname, '../../packages/morph/src/index.ts'),
     },
+  },
+  optimizeDeps: {
+    include: ['flubber'],
   },
   server: {
     // COOP/COEP headers for SharedArrayBuffer are added in Phase 5 (ffmpeg.wasm).
