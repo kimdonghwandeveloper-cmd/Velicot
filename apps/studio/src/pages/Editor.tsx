@@ -42,6 +42,12 @@ export function Editor({ filename, initialModel, onBackToHome }: Props) {
 
   const { undo, redo, canUndo } = useHistory(canvas)
 
+  // Eagerly populate svgRootRef so export reset works even without prior playback.
+  useEffect(() => {
+    const svg = containerRef.current?.querySelector<SVGSVGElement>('svg')
+    if (svg) svgRootRef.current = svg
+  })
+
   const handleAnimationTick = useCallback(
     (frameValues: Parameters<typeof applyAnimationFrame>[1]) => {
       const svgRoot = svgRootRef.current

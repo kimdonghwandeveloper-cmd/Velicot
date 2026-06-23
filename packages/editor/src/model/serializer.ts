@@ -99,6 +99,10 @@ export function serializeModel(model: CanvasModel): string {
 export function deserializeModel(json: string): CanvasModel {
   const parsed: unknown = JSON.parse(json);
   assertCanvasModel(parsed);
+  // Ensure keyframes are sorted by time ascending so binary search in interpolate is correct.
+  parsed.animation?.tracks.forEach((track) => {
+    track.keyframes.sort((a: { time: number }, b: { time: number }) => a.time - b.time);
+  });
   return parsed;
 }
 

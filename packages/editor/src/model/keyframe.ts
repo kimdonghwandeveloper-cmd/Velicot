@@ -11,13 +11,23 @@ export interface EasingDef {
   params?: [number, number, number, number];
 }
 
-export type AnimatableProperty = 'opacity' | 'transform' | 'path';
+/**
+ * Animatable properties. `transform` is split into independent numeric
+ * sub-properties so each can be keyframed separately and recombined into a
+ * single valid SVG transform string at apply time.
+ */
+export type AnimatableProperty =
+  | 'opacity'
+  | 'translateX'
+  | 'translateY'
+  | 'rotate'
+  | 'scale'
+  | 'path';
 
 export interface Keyframe {
   /** Time offset in milliseconds from animation start */
   time: number;
-  /** opacity/transform → number (opacity: 0–1, transform: numeric value per axis),
-   *  path → SVG path data string */
+  /** Numeric properties → number; path → SVG path data string */
   value: number | string;
   easing: EasingDef;
 }
@@ -45,10 +55,13 @@ export interface AnimationData {
   /** Target playback frame rate */
   fps: number;
   tracks: AnimationTrack[];
+  /** When true (default), playback restarts from 0 after reaching duration. */
+  loop?: boolean;
 }
 
 export const DEFAULT_ANIMATION_DATA: AnimationData = {
   duration: 1000,
   fps: 60,
   tracks: [],
+  loop: true,
 };
