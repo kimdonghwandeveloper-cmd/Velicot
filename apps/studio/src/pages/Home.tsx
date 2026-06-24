@@ -34,9 +34,10 @@ function timeAgo(ts: number): string {
 
 interface Props {
   onOpenEditor: (model: CanvasModel, filename: string) => void
+  onOpenFsmPreview?: () => void
 }
 
-export function Home({ onOpenEditor }: Props) {
+export function Home({ onOpenEditor, onOpenFsmPreview }: Props) {
   const [showNewFile, setShowNewFile] = useState(false)
   const [recents, setRecents] = useState<RecentFile[]>(loadRecents)
   const [activeNav, setActiveNav] = useState<string>('Home')
@@ -151,6 +152,15 @@ export function Home({ onOpenEditor }: Props) {
           >
             New File
           </button>
+          {onOpenFsmPreview && (
+            <button
+              onClick={onOpenFsmPreview}
+              style={{ ...outlineBtnStyle, marginLeft: 8 }}
+              title="Preview State Machine transitions"
+            >
+              FSM Preview
+            </button>
+          )}
         </div>
       </header>
 

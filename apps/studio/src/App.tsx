@@ -2,10 +2,12 @@ import React, { useState } from 'react'
 import type { CanvasModel } from '@velicot/editor'
 import { Home } from './pages/Home'
 import { Editor } from './pages/Editor'
+import { StateMachinePreview } from './pages/StateMachinePreview'
 
 type Page =
   | { view: 'home' }
   | { view: 'editor'; filename: string; initialModel: CanvasModel | null }
+  | { view: 'fsm-preview' }
 
 export default function App() {
   const [page, setPage] = useState<Page>({ view: 'home' })
@@ -26,5 +28,9 @@ export default function App() {
     )
   }
 
-  return <Home onOpenEditor={openEditor} />
+  if (page.view === 'fsm-preview') {
+    return <StateMachinePreview onBack={backToHome} />
+  }
+
+  return <Home onOpenEditor={openEditor} onOpenFsmPreview={() => setPage({ view: 'fsm-preview' })} />
 }
