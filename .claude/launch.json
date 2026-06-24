@@ -4,8 +4,9 @@
     {
       "name": "studio",
       "runtimeExecutable": "/bin/bash",
-      "runtimeArgs": ["-c", "cd apps/studio && npx --yes vite --port $PORT"],
-      "port": 5173
+      "runtimeArgs": ["-c", "export PATH=\"/home/kimdonghwan/.local/share/fnm/node-versions/v24.15.0/installation/bin:$PATH\" && cd apps/studio && pnpm exec vite --port $PORT"],
+      "port": 5173,
+      "autoPort": true
     }
   ]
 }
