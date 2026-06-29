@@ -33,7 +33,7 @@ function formatMs(ms: number): string {
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`
 }
 
-const PROPERTY_OPTIONS: AnimatableProperty[] = ['opacity', 'transform', 'path']
+const PROPERTY_OPTIONS: AnimatableProperty[] = ['opacity', 'translateX', 'translateY', 'rotate', 'scale', 'path']
 
 const EASING_OPTIONS: Array<{ label: string; value: EasingDef['type'] }> = [
   { label: 'Linear', value: 'linear' },

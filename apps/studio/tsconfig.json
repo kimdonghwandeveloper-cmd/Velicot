@@ -3,15 +3,19 @@
   "compilerOptions": {
     "noEmit": true,
     "paths": {
-      "@velicot/editor": ["../../packages/editor/src/index.ts"]
+      "@velicot/editor": ["../../packages/editor/src/index.ts"],
+      "@velicot/fsm": ["../../packages/fsm/src/index.ts"]
     }
   },
   "include": [
     "src",
-    "../../packages/editor/src"
+    "../../packages/editor/src",
+    "../../packages/fsm/src"
   ],
   "exclude": [
     "../../packages/editor/src/**/__tests__",
-    "../../packages/editor/src/**/*.test.ts"
+    "../../packages/editor/src/**/*.test.ts",
+    "../../packages/fsm/src/**/__tests__",
+    "../../packages/fsm/src/**/*.test.ts"
   ]
 }
