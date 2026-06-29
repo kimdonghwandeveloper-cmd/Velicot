@@ -3,9 +3,11 @@ import {
   useSvgCanvas, useHistory, serializeModel, usePlayback, applyAnimationFrame,
   DEFAULT_ANIMATION_DATA, type CanvasModel, type AnimationData,
 } from '@velicot/editor'
+import { DEFAULT_FSM_DOCUMENT, type FsmDocument } from '@velicot/fsm'
 import { EditorToolbar, type EditorToolId } from '../components/EditorToolbar'
 import { LayersPanel } from '../components/LayersPanel'
 import { Timeline } from '../components/Timeline'
+import { StateMachinePanel } from '../components/StateMachinePanel'
 import { saveRecent } from './Home'
 
 type EditorTab = 'Design' | 'Animate' | 'State Machine'
@@ -24,6 +26,7 @@ export function Editor({ filename, initialModel, onBackToHome }: Props) {
   const [animation, setAnimation] = useState<AnimationData>(
     initialModel?.animation ?? { ...DEFAULT_ANIMATION_DATA },
   )
+  const [fsmDoc, setFsmDoc] = useState<FsmDocument>(DEFAULT_FSM_DOCUMENT)
   const svgRootRef = useRef<SVGSVGElement | null>(null)
 
   const handleModelChange = useCallback((m: CanvasModel) => setModel(m), [])
@@ -234,79 +237,88 @@ export function Editor({ filename, initialModel, onBackToHome }: Props) {
 
       {/* Main workspace */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <EditorToolbar activeTool={activeTool} onToolChange={handleToolChange} />
+        {activeTab !== 'State Machine' && (
+          <EditorToolbar activeTool={activeTool} onToolChange={handleToolChange} />
+        )}
 
-        {/* Canvas area */}
-        <div ref={canvasAreaRef} style={{
-          flex: 1, background: 'var(--bg-base)', overflow: 'auto',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          position: 'relative',
-          cursor: activeTool === 'hand' ? 'grab' : 'default',
-          backgroundImage: 'radial-gradient(circle, var(--border) 1px, transparent 1px)',
-          backgroundSize: '24px 24px',
-        }}>
-          {/* Artboard label */}
-          <div style={{ position: 'relative' }}>
-            <div style={{
-              position: 'absolute', top: -20, left: 0,
-              fontSize: 11, color: 'var(--text-3)',
+        {activeTab === 'State Machine' ? (
+          <StateMachinePanel fsmDoc={fsmDoc} onFsmDocChange={setFsmDoc} />
+        ) : (
+          <>
+            {/* Canvas area */}
+            <div ref={canvasAreaRef} style={{
+              flex: 1, background: 'var(--bg-base)', overflow: 'auto',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              position: 'relative',
+              cursor: activeTool === 'hand' ? 'grab' : 'default',
+              backgroundImage: 'radial-gradient(circle, var(--border) 1px, transparent 1px)',
+              backgroundSize: '24px 24px',
             }}>
-              Artboard 1 — {initialModel?.canvas.width ?? 512} × {initialModel?.canvas.height ?? 512}
+              {/* Artboard label */}
+              <div style={{ position: 'relative' }}>
+                <div style={{
+                  position: 'absolute', top: -20, left: 0,
+                  fontSize: 11, color: 'var(--text-3)',
+                }}>
+                  Artboard 1 — {initialModel?.canvas.width ?? 512} × {initialModel?.canvas.height ?? 512}
+                </div>
+
+                {/* svgcanvas container */}
+                <div
+                  ref={containerRef}
+                  style={{
+                    boxShadow: '0 0 0 1px var(--border), 0 8px 32px rgba(0,0,0,0.4)',
+                  }}
+                />
+
+                {/* Empty canvas overlay (shown when no shapes drawn) */}
+                {(model?.layers.length ?? 0) === 0 && (
+                  <div style={{
+                    position: 'absolute', inset: 0, pointerEvents: 'none',
+                    display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center', gap: 8,
+                  }}>
+                    <EmptyCanvasIcon />
+                    <span style={{ color: 'var(--text-3)', fontSize: 13 }}>Empty canvas</span>
+                    <span style={{ color: 'var(--text-3)', fontSize: 11 }}>
+                      Use the pen or shape tools to draw
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* svgcanvas container */}
-            <div
-              ref={containerRef}
-              style={{
-                boxShadow: '0 0 0 1px var(--border), 0 8px 32px rgba(0,0,0,0.4)',
+            <LayersPanel
+              model={model}
+              selectedLayerId={selectedLayerId}
+              onAddLayer={handleAddLayer}
+              onSelectLayer={(id) => {
+                setSelectedLayerId(id)
+                const layer = model?.layers.find((l) => l.id === id)
+                if (layer && canvas) {
+                  try {
+                    (canvas as unknown as { setCurrentLayer: (name: string) => void }).setCurrentLayer(layer.name)
+                  } catch { /* SVGEdit may not support this in all versions */ }
+                }
               }}
             />
-
-            {/* Empty canvas overlay (shown when no shapes drawn) */}
-            {(model?.layers.length ?? 0) === 0 && (
-              <div style={{
-                position: 'absolute', inset: 0, pointerEvents: 'none',
-                display: 'flex', flexDirection: 'column',
-                alignItems: 'center', justifyContent: 'center', gap: 8,
-              }}>
-                <EmptyCanvasIcon />
-                <span style={{ color: 'var(--text-3)', fontSize: 13 }}>Empty canvas</span>
-                <span style={{ color: 'var(--text-3)', fontSize: 11 }}>
-                  Use the pen or shape tools to draw
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <LayersPanel
-          model={model}
-          selectedLayerId={selectedLayerId}
-          onAddLayer={handleAddLayer}
-          onSelectLayer={(id) => {
-            setSelectedLayerId(id)
-            // Sync active layer to SVGEdit so new shapes go into the selected layer
-            const layer = model?.layers.find((l) => l.id === id)
-            if (layer && canvas) {
-              try {
-                (canvas as unknown as { setCurrentLayer: (name: string) => void }).setCurrentLayer(layer.name)
-              } catch { /* SVGEdit may not support this in all versions */ }
-            }
-          }}
-        />
+          </>
+        )}
       </div>
 
-      {/* Timeline */}
-      <Timeline
-        animation={animation}
-        onAnimationChange={handleAnimationChange}
-        currentTime={currentTime}
-        isPlaying={isPlaying}
-        onPlay={play}
-        onPause={pause}
-        onSeek={seek}
-        selectedLayerId={selectedLayerId}
-      />
+      {/* Timeline — hidden in State Machine tab */}
+      {activeTab !== 'State Machine' && (
+        <Timeline
+          animation={animation}
+          onAnimationChange={handleAnimationChange}
+          currentTime={currentTime}
+          isPlaying={isPlaying}
+          onPlay={play}
+          onPause={pause}
+          onSeek={seek}
+          selectedLayerId={selectedLayerId}
+        />
+      )}
     </div>
   )
 }
