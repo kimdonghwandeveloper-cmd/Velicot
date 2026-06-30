@@ -17,6 +17,9 @@ importers:
       '@velicot/editor':
         specifier: workspace:*
         version: link:../../packages/editor
+      '@velicot/export':
+        specifier: workspace:*
+        version: link:../../packages/export
       '@velicot/fsm':
         specifier: workspace:*
         version: link:../../packages/fsm
