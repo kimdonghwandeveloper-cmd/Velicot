@@ -9,6 +9,7 @@ import { EditorToolbar, type EditorToolId } from '../components/EditorToolbar'
 import { LayersPanel } from '../components/LayersPanel'
 import { Timeline } from '../components/Timeline'
 import { StateMachinePanel } from '../components/StateMachinePanel'
+import { ExportDialog } from '../components/ExportDialog'
 import { saveRecent } from './Home'
 
 type EditorTab = 'Design' | 'Animate' | 'State Machine'
@@ -28,6 +29,7 @@ export function Editor({ filename, initialModel, onBackToHome }: Props) {
     initialModel?.animation ?? { ...DEFAULT_ANIMATION_DATA },
   )
   const [fsmDoc, setFsmDoc] = useState<FsmDocument>(DEFAULT_FSM_DOCUMENT)
+  const [showExportDialog, setShowExportDialog] = useState(false)
   const svgRootRef = useRef<SVGSVGElement | null>(null)
 
   const handleModelChange = useCallback((m: CanvasModel) => setModel(m), [])
@@ -267,6 +269,20 @@ export function Editor({ filename, initialModel, onBackToHome }: Props) {
           </div>
           <button
             onClick={handleExport}
+            title="Save project as .kfm.json"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'var(--bg-elevated)', color: 'var(--text-2)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-sm)', padding: '6px 14px',
+              fontWeight: 500, fontSize: 12,
+            }}
+          >
+            Save .kfm
+          </button>
+          <button
+            onClick={() => setShowExportDialog(true)}
+            title="Export animation as mp4/webm/gif"
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               background: 'var(--accent)', color: '#fff',
@@ -274,7 +290,7 @@ export function Editor({ filename, initialModel, onBackToHome }: Props) {
               fontWeight: 600, fontSize: 12,
             }}
           >
-            <span style={{ fontSize: 12 }}>⬇</span> Export
+            <span style={{ fontSize: 12 }}>⬇</span> Export Video
           </button>
         </div>
       </header>
@@ -364,6 +380,16 @@ export function Editor({ filename, initialModel, onBackToHome }: Props) {
           onPause={pause}
           onSeek={seek}
           selectedLayerId={selectedLayerId}
+        />
+      )}
+
+      {/* Export Video dialog */}
+      {showExportDialog && model && (
+        <ExportDialog
+          filename={filename}
+          canvasModel={{ ...model, animation }}
+          animationData={animation}
+          onClose={() => setShowExportDialog(false)}
         />
       )}
     </div>

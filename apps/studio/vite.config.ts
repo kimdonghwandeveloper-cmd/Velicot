@@ -8,13 +8,17 @@ export default defineConfig({
     alias: {
       '@velicot/editor': resolve(__dirname, '../../packages/editor/src/index.ts'),
       '@velicot/morph': resolve(__dirname, '../../packages/morph/src/index.ts'),
+      '@velicot/export': resolve(__dirname, '../../packages/export/src/index.ts'),
     },
   },
   optimizeDeps: {
     include: ['flubber'],
+    exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util'],
   },
   server: {
-    // COOP/COEP headers for SharedArrayBuffer are added in Phase 5 (ffmpeg.wasm).
-    // Omitting here so the preview iframe can load without COEP restrictions.
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
   },
 })
