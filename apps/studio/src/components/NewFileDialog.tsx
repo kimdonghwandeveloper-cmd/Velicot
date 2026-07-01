@@ -26,7 +26,11 @@ export function NewFileDialog({ onClose, onCreate }: Props) {
     if (p && p.w > 0) { setW(p.w); setH(p.h) }
   }
 
+  const dimensionsValid = Number.isInteger(w) && Number.isInteger(h)
+    && w >= 1 && w <= 4096 && h >= 1 && h <= 4096
+
   const handleCreate = () => {
+    if (!dimensionsValid) return
     const model = createEmptyCanvas(w, h)
     onCreate(model, 'untitled.kfm.json')
   }
@@ -77,7 +81,15 @@ export function NewFileDialog({ onClose, onCreate }: Props) {
           />
         </div>
 
-        <button onClick={handleCreate} style={createBtnStyle}>
+        <button
+          onClick={handleCreate}
+          disabled={!dimensionsValid}
+          style={{
+            ...createBtnStyle,
+            opacity: dimensionsValid ? 1 : 0.5,
+            cursor: dimensionsValid ? 'pointer' : 'not-allowed',
+          }}
+        >
           Create Artboard
         </button>
       </div>

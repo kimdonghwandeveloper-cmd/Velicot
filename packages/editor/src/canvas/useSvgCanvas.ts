@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import SvgCanvas from '@svgedit/svgcanvas';
 import type { ToolId } from '../toolbar/tools';
 import type { CanvasModel } from '../model/layer';
-import { svgDomToModel } from '../model/serializer';
+import { modelToSvgDom, svgDomToModel } from '../model/serializer';
 
 export type SvgCanvasInstance = InstanceType<typeof SvgCanvas>;
 
@@ -11,6 +11,8 @@ interface UseSvgCanvasOptions {
   height?: number;
   /** Initial SVG string to load (from a previously saved CanvasModel.svgString) */
   initialSvgString?: string;
+  /** Model fallback for public KFM files, which intentionally omit svgString. */
+  initialModel?: CanvasModel;
   onModelChange?: (model: CanvasModel) => void;
   /** Called when the user selects an element on canvas; receives the layer id */
   onLayerSelect?: (layerId: string) => void;
@@ -27,6 +29,7 @@ export function useSvgCanvas({
   width = 512,
   height = 512,
   initialSvgString,
+  initialModel,
   onModelChange,
   onLayerSelect,
 }: UseSvgCanvasOptions = {}): UseSvgCanvasReturn {
@@ -80,6 +83,11 @@ export function useSvgCanvas({
     // Restore saved SVG if provided
     if (initialSvgString) {
       svgCanvas.setSvgString(initialSvgString);
+    } else if (initialModel && initialModel.layers.length > 0) {
+      const svgRoot = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svgRoot.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      modelToSvgDom(initialModel, svgRoot);
+      svgCanvas.setSvgString(svgRoot.outerHTML);
     }
 
     if (onModelChange) {
@@ -91,14 +99,16 @@ export function useSvgCanvas({
       });
     }
 
+    let selectionTimer: ReturnType<typeof setTimeout> | undefined;
+    let handleMouseUp: (() => void) | undefined;
     if (onLayerSelect) {
       // SVGEdit has no "element selected" event — poll on mouseup instead.
       // After any click on the canvas, check getSelectedElements() and walk
       // up to the nearest g[data-layer-id] to determine which layer was clicked.
-      const handleMouseUp = () => {
+      handleMouseUp = () => {
         // Defer one tick so SVGEdit finishes updating selectedElements
         // before we read it.
-        setTimeout(() => {
+        selectionTimer = setTimeout(() => {
           const selectedEls: Element[] = (
             svgCanvas as unknown as { getSelectedElements: () => Element[] }
           ).getSelectedElements().filter(Boolean);
@@ -108,6 +118,14 @@ export function useSvgCanvas({
           while (node) {
             const layerId = node.getAttribute('data-layer-id');
             if (layerId) { onLayerSelect(layerId); return; }
+            if (
+              node.nodeName.toLowerCase() === 'g' &&
+              node.classList.contains('layer') &&
+              node.id
+            ) {
+              onLayerSelect(node.id);
+              return;
+            }
             node = node.parentElement;
           }
         }, 0);
@@ -116,12 +134,14 @@ export function useSvgCanvas({
     }
 
     return () => {
+      if (selectionTimer !== undefined) clearTimeout(selectionTimer);
+      if (handleMouseUp) container.removeEventListener('mouseup', handleMouseUp);
       canvasRef.current = null;
       // Clear SVGEdit-injected DOM so that re-runs (React StrictMode, HMR)
       // start with an empty container instead of accumulating stale instances.
       container.innerHTML = '';
     };
-  // onModelChange / initialSvgString intentionally excluded — callers must memoize them
+  // Callbacks and initial data are intentionally mount-only; callers must memoize callbacks.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [width, height]);
 

@@ -66,8 +66,7 @@ export function useStateMachine(
   // Stable machine instance — recreated only when the document changes.
   const machine = useMemo(
     () => new StateMachine(doc, { interruptPolicy }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [doc],
+    [doc, interruptPolicy],
   )
 
   const [snap, setSnap] = useState<StateMachineState>(() => snapshot(machine))
@@ -104,12 +103,12 @@ export function useStateMachine(
   const sendInput = useCallback(
     (inputName: string, inputValue: string) => {
       if (machine.interruptPolicy === 'defer' && animPlayingRef.current) {
-        // Queue the latest input; discard any previously queued one.
-        deferredRef.current = { inputName, inputValue }
         const result = machine.evaluate(inputName, inputValue)
-        if (result.matched && result.targetState !== null) {
-          onDeferredRef.current?.(result.targetState)
-        }
+        if (!result.matched || result.targetState === null) return
+        // Queue the latest valid input; invalid input must not erase a valid
+        // transition that is already waiting.
+        deferredRef.current = { inputName, inputValue }
+        onDeferredRef.current?.(result.targetState)
         return
       }
       flush(inputName, inputValue)

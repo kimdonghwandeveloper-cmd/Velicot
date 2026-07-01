@@ -1,13 +1,13 @@
 import React from 'react'
 
-export type EditorToolId = 'select' | 'line' | 'path' | 'rect' | 'ellipse' | 'hand'
+export type EditorToolId = 'select' | 'line' | 'fhpath' | 'rect' | 'ellipse' | 'hand'
 
 interface ToolEntry { key: string; id: EditorToolId; label: string; title: string }
 
 const TOOLS: ToolEntry[] = [
   { key: 'V', id: 'select',  label: 'V', title: 'Select (V)' },
   { key: 'A', id: 'line',    label: 'A', title: 'Line/Arc (A)' },
-  { key: 'P', id: 'path',    label: 'P', title: 'Pen (P)' },
+  { key: 'P', id: 'fhpath',  label: 'P', title: 'Pen (P)' },
   { key: 'R', id: 'rect',    label: 'R', title: 'Rectangle (R)' },
   { key: 'O', id: 'ellipse', label: 'O', title: 'Oval (O)' },
   { key: 'H', id: 'hand',    label: 'H', title: 'Hand/Pan (H)' },

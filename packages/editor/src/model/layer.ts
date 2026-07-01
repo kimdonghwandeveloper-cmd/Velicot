@@ -22,6 +22,14 @@ export function createEmptyCanvas(
   width = 512,
   height = 512,
 ): CanvasModel {
+  if (
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    throw new Error('Canvas dimensions must be positive finite numbers');
+  }
   return {
     version: '1.0',
     canvas: { width, height },

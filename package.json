@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "pnpm --filter studio dev",
     "build": "pnpm -r build",
-    "test": "pnpm -r test"
+    "test": "pnpm -r test",
+    "check": "pnpm test && pnpm build"
   },
   "devDependencies": {
     "typescript": "^5.4.0"

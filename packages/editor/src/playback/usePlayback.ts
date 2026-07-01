@@ -79,11 +79,17 @@ export function usePlayback(
   const play = useCallback(() => {
     if (!animation) return;
     stop();
+    if (!Number.isFinite(animation.duration) || animation.duration <= 0) {
+      setCurrentTime(0);
+      computeFrame(0);
+      setIsPlaying(false);
+      return;
+    }
     startWallRef.current = performance.now();
-    startTimeRef.current = currentTime >= (animation.duration ?? 0) ? 0 : currentTime;
+    startTimeRef.current = currentTime >= animation.duration ? 0 : currentTime;
     setIsPlaying(true);
     rafRef.current = requestAnimationFrame(tick);
-  }, [animation, currentTime, stop, tick]);
+  }, [animation, computeFrame, currentTime, stop, tick]);
 
   const pause = useCallback(() => {
     stop();
@@ -100,6 +106,18 @@ export function usePlayback(
   );
 
   useEffect(() => () => stop(), [stop]);
+
+  // A scheduled RAF closes over the animation that created it. Stop playback
+  // when tracks or timing change so an obsolete loop cannot keep applying
+  // stale frame values.
+  useEffect(() => {
+    stop();
+    setIsPlaying(false);
+    setCurrentTime((time) => {
+      const duration = animation?.duration;
+      return Number.isFinite(duration) ? Math.min(time, Math.max(0, duration ?? 0)) : 0;
+    });
+  }, [animation, stop]);
 
   return { currentTime, isPlaying, play, pause, seek };
 }

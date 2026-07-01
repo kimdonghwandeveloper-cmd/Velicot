@@ -140,4 +140,32 @@ describe('useStateMachine — defer policy', () => {
     act(() => result.current.notifyAnimationFinished())
     expect(result.current.machineState.currentState).toBe('error')
   })
+
+  it('does not erase a valid deferred transition when an invalid input arrives', () => {
+    const { result } = renderHook(() =>
+      useStateMachine(DEFAULT_FSM_DOCUMENT, { interruptPolicy: 'defer' }),
+    )
+
+    act(() => result.current.sendInput('status', 'working'))
+    act(() => result.current.sendInput('status', 'done'))
+    act(() => result.current.sendInput('unknown', 'value'))
+    act(() => result.current.notifyAnimationFinished())
+
+    expect(result.current.machineState.currentState).toBe('done')
+  })
+
+  it('recreates the machine when the interrupt policy changes', () => {
+    const { result, rerender } = renderHook(
+      ({ policy }: { policy: 'immediate' | 'defer' }) =>
+        useStateMachine(DEFAULT_FSM_DOCUMENT, { interruptPolicy: policy }),
+      { initialProps: { policy: 'defer' as const } },
+    )
+
+    act(() => result.current.sendInput('status', 'working'))
+    rerender({ policy: 'immediate' })
+    act(() => result.current.sendInput('status', 'working'))
+    act(() => result.current.sendInput('status', 'error'))
+
+    expect(result.current.machineState.currentState).toBe('error')
+  })
 })

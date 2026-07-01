@@ -8,18 +8,25 @@ interface UseHistoryReturn {
   canRedo: boolean;
 }
 
+interface UndoManagerLike {
+  undo?: () => void;
+  redo?: () => void;
+  getUndoStackSize?: () => number;
+  getRedoStackSize?: () => number;
+}
+
 export function useHistory(canvas: SvgCanvasInstance | null): UseHistoryReturn {
   const [, forceUpdate] = useState(0);
 
   const undo = useCallback(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (canvas?.undoMgr as any)?.undo?.();
+    const undoManager = canvas?.undoMgr as unknown as UndoManagerLike | undefined;
+    undoManager?.undo?.();
     forceUpdate((n) => n + 1);
   }, [canvas]);
 
   const redo = useCallback(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (canvas?.undoMgr as any)?.redo?.();
+    const undoManager = canvas?.undoMgr as unknown as UndoManagerLike | undefined;
+    undoManager?.redo?.();
     forceUpdate((n) => n + 1);
   }, [canvas]);
 
@@ -41,8 +48,7 @@ export function useHistory(canvas: SvgCanvasInstance | null): UseHistoryReturn {
     return () => window.removeEventListener('keydown', handler);
   }, [undo, redo]);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const undoMgr = canvas?.undoMgr as any;
+  const undoMgr = canvas?.undoMgr as unknown as UndoManagerLike | undefined;
   const canUndo = (undoMgr?.getUndoStackSize?.() ?? 0) > 0;
   const canRedo = (undoMgr?.getRedoStackSize?.() ?? 0) > 0;
 

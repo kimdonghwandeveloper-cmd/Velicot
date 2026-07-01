@@ -28,14 +28,21 @@ describe('interpolateMorph', () => {
     }
   })
 
-  it('falls back to step on completely invalid path input without throwing', () => {
+  it('keeps the source path until the endpoint on invalid input', () => {
     // flubber throws on non-path strings it cannot parse
     const badPath = 'NOT_A_PATH'
-    expect(() => interpolateMorph(badPath, SQUARE, 0.5)).not.toThrow()
-    const result = interpolateMorph(badPath, SQUARE, 0.3)
-    expect(result).toBe(badPath)
-    const resultOver = interpolateMorph(badPath, SQUARE, 0.7)
-    expect(resultOver).toBe(SQUARE)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    try {
+      expect(() => interpolateMorph(badPath, SQUARE, 0.5)).not.toThrow()
+      const result = interpolateMorph(badPath, SQUARE, 0.3)
+      expect(result).toBe(badPath)
+      const resultOver = interpolateMorph(badPath, SQUARE, 0.7)
+      expect(resultOver).toBe(badPath)
+      expect(interpolateMorph(badPath, SQUARE, 1)).toBe(SQUARE)
+      expect(warn).toHaveBeenCalledTimes(1)
+    } finally {
+      warn.mockRestore()
+    }
   })
 
   it('accepts maxSegmentLength option', () => {

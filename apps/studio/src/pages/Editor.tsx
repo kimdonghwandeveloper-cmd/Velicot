@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  useSvgCanvas, useHistory, serializeModel, usePlayback, applyAnimationFrame,
+  useSvgCanvas, useHistory, serializeModel, serializeKfm, usePlayback, applyAnimationFrame,
+  resetAnimationFrame,
   DEFAULT_ANIMATION_DATA, type CanvasModel, type AnimationData,
 } from '@velicot/editor'
 import { DEFAULT_FSM_DOCUMENT, type FsmDocument } from '@velicot/fsm'
@@ -20,7 +21,7 @@ interface Props {
 }
 
 export function Editor({ filename, initialModel, onBackToHome }: Props) {
-  const [activeTab, setActiveTab] = useState<EditorTab>('Animate')
+  const [activeTab, setActiveTab] = useState<EditorTab>('Design')
   const [activeTool, setActiveTool] = useState<EditorToolId>('select')
   const [model, setModel] = useState<CanvasModel | null>(initialModel)
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null)
@@ -41,6 +42,7 @@ export function Editor({ filename, initialModel, onBackToHome }: Props) {
     width: initialModel?.canvas.width ?? 512,
     height: initialModel?.canvas.height ?? 512,
     initialSvgString: initialModel?.svgString,
+    initialModel: initialModel ?? undefined,
     onModelChange: handleModelChange,
     onLayerSelect: handleLayerSelect,
   })
@@ -112,20 +114,64 @@ export function Editor({ filename, initialModel, onBackToHome }: Props) {
   const handleAddLayer = useCallback(() => {
     if (!canvas) return
     const layerCount = (model?.layers.length ?? 0) + 1
-    const name = `Layer ${layerCount}`;
-    (canvas as unknown as { createLayer: (name: string) => void }).createLayer(name)
+    const name = `Layer ${layerCount}`
+    const layerCanvas = canvas as unknown as { createLayer?: (layerName: string) => void }
+    layerCanvas.createLayer?.(name)
   }, [canvas, model])
 
-  const handleToolChange = (id: EditorToolId) => {
+  const handleToolChange = useCallback((id: EditorToolId) => {
     setActiveTool(id)
     // 'hand' is handled by our pan listener — don't pass to SVGEdit
     if (id !== 'hand') {
-      setTool(id as Parameters<typeof setTool>[0])
+      setTool(id)
     } else {
       // Switch SVGEdit back to select so it doesn't capture mouse events unexpectedly
-      setTool('select' as Parameters<typeof setTool>[0])
+      setTool('select')
     }
-  }
+  }, [setTool])
+
+  useEffect(() => {
+    const keyToTool: Record<string, EditorToolId> = {
+      v: 'select',
+      a: 'line',
+      p: 'fhpath',
+      r: 'rect',
+      o: 'ellipse',
+      h: 'hand',
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+      ) {
+        return
+      }
+      if (event.ctrlKey || event.metaKey || event.altKey) return
+
+      const tool = keyToTool[event.key.toLowerCase()]
+      if (tool) {
+        handleToolChange(tool)
+        return
+      }
+      if (event.key === ' ' && activeTab === 'Animate') {
+        event.preventDefault()
+        if (isPlaying) pause()
+        else play()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [activeTab, handleToolChange, isPlaying, pause, play])
+
+  useEffect(() => {
+    if (activeTab === 'Animate') return
+    if (isPlaying) pause()
+    const svgRoot = svgRootRef.current
+      ?? containerRef.current?.querySelector<SVGSVGElement>('svg')
+      ?? null
+    if (svgRoot) resetAnimationFrame(svgRoot)
+  }, [activeTab, containerRef, isPlaying, pause])
 
   const handleExport = () => {
     if (!model) return
@@ -133,16 +179,14 @@ export function Editor({ filename, initialModel, onBackToHome }: Props) {
     // playback values (opacity/transform) are not baked into the export.
     const svgRoot = svgRootRef.current
     if (svgRoot) {
-      svgRoot.querySelectorAll<SVGGElement>('g[data-layer-id]').forEach((g) => {
-        g.style.opacity = ''
-        g.removeAttribute('transform')
-      })
+      resetAnimationFrame(svgRoot)
     }
     const modelWithSvg = { ...model, svgString: getSvgString(), animation }
-    const json = serializeModel(modelWithSvg)
-    const blob = new Blob([json], { type: 'application/json' })
+    const editorJson = serializeModel(modelWithSvg)
+    const exportJson = serializeKfm(modelWithSvg)
+    const blob = new Blob([exportJson], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
-    saveRecent(filename, json)
+    saveRecent(filename, editorJson)
     const a = document.createElement('a')
     a.href = url
     a.download = filename
@@ -313,7 +357,10 @@ export function Editor({ filename, initialModel, onBackToHome }: Props) {
                 const layer = model?.layers.find((l) => l.id === id)
                 if (layer && canvas) {
                   try {
-                    (canvas as unknown as { setCurrentLayer: (name: string) => void }).setCurrentLayer(layer.name)
+                    const layerCanvas = canvas as unknown as {
+                      setCurrentLayer?: (layerName: string) => void
+                    }
+                    layerCanvas.setCurrentLayer?.(layer.name)
                   } catch { /* SVGEdit may not support this in all versions */ }
                 }
               }}
@@ -322,8 +369,8 @@ export function Editor({ filename, initialModel, onBackToHome }: Props) {
         )}
       </div>
 
-      {/* Timeline — hidden in State Machine tab */}
-      {activeTab !== 'State Machine' && (
+      {/* Timeline belongs to animation mode only. */}
+      {activeTab === 'Animate' && (
         <Timeline
           animation={animation}
           onAnimationChange={handleAnimationChange}
