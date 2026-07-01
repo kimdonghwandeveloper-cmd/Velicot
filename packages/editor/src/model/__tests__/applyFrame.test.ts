@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { JSDOM } from 'jsdom';
-import { applyAnimationFrame } from '../../playback/applyFrame';
+import { applyAnimationFrame, resetAnimationFrame } from '../../playback/applyFrame';
 
 function makeLayer(id: string): SVGGElement {
   const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -72,5 +72,43 @@ describe('applyAnimationFrame', () => {
     layerA.appendChild(path);
     applyAnimationFrame(svg, new Map([['layer-a', { path: 'M0,0 L10,10' }]]));
     expect(path.getAttribute('d')).toBe('M0,0 L10,10');
+  });
+
+  it('restores original opacity, transform, and path data', () => {
+    layerA.style.opacity = '0.8';
+    layerA.setAttribute('transform', 'translate(4, 5)');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', 'M0,0 L1,1');
+    layerA.appendChild(path);
+
+    applyAnimationFrame(svg, new Map([[
+      'layer-a',
+      { opacity: 0.2, translateX: 20, path: 'M2,2 L3,3' },
+    ]]));
+    resetAnimationFrame(svg);
+
+    expect(layerA.style.opacity).toBe('0.8');
+    expect(layerA.getAttribute('transform')).toBe('translate(4, 5)');
+    expect(path.getAttribute('d')).toBe('M0,0 L1,1');
+  });
+
+  it('supports layer ids containing CSS selector characters', () => {
+    layerA.setAttribute('data-layer-id', 'layer"with.special#chars');
+    expect(() =>
+      applyAnimationFrame(svg, new Map([[
+        'layer"with.special#chars',
+        { opacity: 0.4 },
+      ]])),
+    ).not.toThrow();
+    expect(layerA.style.opacity).toBe('0.4');
+  });
+
+  it('ignores non-finite numeric values', () => {
+    applyAnimationFrame(svg, new Map([[
+      'layer-a',
+      { opacity: Number.NaN, translateX: Number.POSITIVE_INFINITY },
+    ]]));
+    expect(layerA.style.opacity).toBe('');
+    expect(layerA.hasAttribute('transform')).toBe(false);
   });
 });

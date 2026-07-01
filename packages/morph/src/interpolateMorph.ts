@@ -1,15 +1,13 @@
+/// <reference path="./flubber.d.ts" />
+
 import type { MorphOptions } from './types'
 
-// flubber is a CJS bundle with no type declarations — import via named export
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import { interpolate as flubberInterpolateRaw } from 'flubber'
+import { interpolate as flubberInterpolate } from 'flubber'
 
-const flubberInterpolate = flubberInterpolateRaw as (
-  from: string,
-  to: string,
-  options?: { maxSegmentLength?: number },
-) => (t: number) => string
+type MorphInterpolator = (progress: number) => string
+
+const MAX_CACHE_ENTRIES = 100
+const interpolatorCache = new Map<string, MorphInterpolator>()
 
 /**
  * Interpolates between two SVG path strings using flubber.
@@ -22,12 +20,33 @@ export function interpolateMorph(
   t: number,
   options?: MorphOptions,
 ): string {
-  try {
-    const fn = flubberInterpolate(fromPath, toPath, {
-      maxSegmentLength: options?.maxSegmentLength ?? 10,
-    })
-    return fn(t)
-  } catch {
-    return t < 0.5 ? fromPath : toPath
+  if (t <= 0) return fromPath
+  if (t >= 1) return toPath
+
+  const requestedSegmentLength = options?.maxSegmentLength
+  const maxSegmentLength = requestedSegmentLength !== undefined
+    && Number.isFinite(requestedSegmentLength)
+    && requestedSegmentLength > 0
+    ? requestedSegmentLength
+    : 10
+  const cacheKey = JSON.stringify([fromPath, toPath, maxSegmentLength])
+  let interpolator = interpolatorCache.get(cacheKey)
+
+  if (!interpolator) {
+    try {
+      interpolator = flubberInterpolate(fromPath, toPath, { maxSegmentLength })
+    } catch (error) {
+      console.warn(
+        '[interpolateMorph] Unable to interpolate paths; keeping the source path.',
+        error,
+      )
+      interpolator = (progress) => progress >= 1 ? toPath : fromPath
+    }
+    if (interpolatorCache.size >= MAX_CACHE_ENTRIES) {
+      const oldestKey = interpolatorCache.keys().next().value
+      if (oldestKey !== undefined) interpolatorCache.delete(oldestKey)
+    }
+    interpolatorCache.set(cacheKey, interpolator)
   }
+  return interpolator(t)
 }

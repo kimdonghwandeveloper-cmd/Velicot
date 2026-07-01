@@ -1,5 +1,6 @@
 export const TOOL_IDS = {
   SELECT: 'select',
+  LINE: 'line',
   FREEHAND: 'fhpath',
   RECT: 'rect',
   ELLIPSE: 'ellipse',
@@ -17,6 +18,7 @@ export interface ToolDef {
 
 export const TOOLS: ToolDef[] = [
   { id: TOOL_IDS.SELECT, label: 'Select', shortcut: 'S' },
+  { id: TOOL_IDS.LINE, label: 'Line', shortcut: 'L' },
   { id: TOOL_IDS.FREEHAND, label: 'Pen', shortcut: 'P' },
   { id: TOOL_IDS.RECT, label: 'Rectangle', shortcut: 'R' },
   { id: TOOL_IDS.ELLIPSE, label: 'Ellipse', shortcut: 'E' },

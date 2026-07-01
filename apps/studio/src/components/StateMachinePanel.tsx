@@ -2,6 +2,7 @@ import React, { useCallback, useRef, useState } from 'react'
 import {
   useStateMachine,
   DEFAULT_FSM_DOCUMENT,
+  parseFsmDocument,
   type FsmDocument,
   type CharacterState,
 } from '@velicot/fsm'
@@ -63,10 +64,7 @@ export function StateMachinePanel({ fsmDoc, onFsmDocChange }: Props) {
     const reader = new FileReader()
     reader.onload = (ev) => {
       try {
-        const parsed = JSON.parse(ev.target?.result as string) as FsmDocument
-        if (!parsed.states || !parsed.transitions || !parsed.animations) {
-          throw new Error('Invalid .fsm.json format')
-        }
+        const parsed = parseFsmDocument(JSON.parse(String(ev.target?.result ?? '')))
         onFsmDocChange(parsed)
         setJsonText(null)
         setJsonError(null)
@@ -82,15 +80,11 @@ export function StateMachinePanel({ fsmDoc, onFsmDocChange }: Props) {
   const handleJsonEdit = (text: string) => {
     setJsonText(text)
     try {
-      const parsed = JSON.parse(text) as FsmDocument
-      if (!parsed.states || !parsed.transitions || !parsed.animations) {
-        setJsonError('Missing required fields: states, transitions, animations')
-        return
-      }
+      const parsed = parseFsmDocument(JSON.parse(text))
       setJsonError(null)
       onFsmDocChange(parsed)
-    } catch {
-      setJsonError('Invalid JSON')
+    } catch (error) {
+      setJsonError(error instanceof Error ? error.message : 'Invalid FSM document')
     }
   }
 
@@ -272,7 +266,11 @@ export function StateMachinePanel({ fsmDoc, onFsmDocChange }: Props) {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <span style={{ color: 'var(--text-1)', fontWeight: 600, fontSize: 13 }}>FSM Document</span>
-          <SmallBtn onClick={() => { setJsonText(null); onFsmDocChange(DEFAULT_FSM_DOCUMENT) }}>
+          <SmallBtn onClick={() => {
+            setJsonText(null)
+            setJsonError(null)
+            onFsmDocChange(DEFAULT_FSM_DOCUMENT)
+          }}>
             Reset to default
           </SmallBtn>
         </div>

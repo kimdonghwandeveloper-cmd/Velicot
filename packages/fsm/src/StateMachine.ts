@@ -6,6 +6,7 @@ import type {
   StateMachineOptions,
   TransitionResult,
 } from './types'
+import { parseFsmDocument } from './validation'
 
 /**
  * Core state machine logic — clean-room implementation.
@@ -26,7 +27,7 @@ export class StateMachine {
   private _pendingState: CharacterState | null = null
 
   constructor(doc: FsmDocument, options: StateMachineOptions = {}) {
-    this.doc = doc
+    this.doc = parseFsmDocument(doc)
     this.interruptPolicy = options.interruptPolicy ?? 'immediate'
     this._currentState = doc.default
   }
@@ -65,6 +66,9 @@ export class StateMachine {
    * (i.e. after honouring the interrupt policy).
    */
   commitTransition(targetState: CharacterState): void {
+    if (!this.doc.states.includes(targetState)) {
+      throw new Error(`Cannot transition to undeclared state "${targetState}"`)
+    }
     this._isTransitioning = true
     this._pendingState = targetState
   }

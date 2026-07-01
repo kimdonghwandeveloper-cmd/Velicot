@@ -1,7 +1,6 @@
 export { StateMachine } from './StateMachine'
 export { useStateMachine } from './useStateMachine'
 export { DEFAULT_FSM_DOCUMENT } from './defaults'
-export { parseFsmDocument } from './validation'
 export type {
   CharacterState,
   FsmDocument,
