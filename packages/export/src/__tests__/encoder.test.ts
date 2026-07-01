@@ -11,6 +11,7 @@ vi.mock('@ffmpeg/ffmpeg', () => ({
     exec: vi.fn().mockResolvedValue(undefined),
     readFile: vi.fn().mockResolvedValue(new Uint8Array([0x00, 0x01])),
     deleteFile: vi.fn().mockResolvedValue(undefined),
+    terminate: vi.fn(),
   })),
 }))
 

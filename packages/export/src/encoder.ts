@@ -2,11 +2,23 @@ import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { toBlobURL, fetchFile } from '@ffmpeg/util'
 import type { ExportOptions } from './types'
 
-let ffmpegInstance: FFmpeg | null = null
+const BASE_URL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm'
 
-async function getFFmpeg(onLog?: (msg: string) => void): Promise<FFmpeg> {
-  if (ffmpegInstance?.loaded) return ffmpegInstance
+// Cache blob URLs so the CDN is only fetched once per session.
+let cachedBlobUrls: { coreURL: string; wasmURL: string } | null = null
 
+async function loadBlobUrls(): Promise<{ coreURL: string; wasmURL: string }> {
+  if (cachedBlobUrls) return cachedBlobUrls
+  cachedBlobUrls = {
+    coreURL: await toBlobURL(`${BASE_URL}/ffmpeg-core.js`, 'text/javascript'),
+    wasmURL: await toBlobURL(`${BASE_URL}/ffmpeg-core.wasm`, 'application/wasm'),
+  }
+  return cachedBlobUrls
+}
+
+// Create a fresh FFmpeg instance for each encode to avoid WASM memory corruption
+// between successive runs.
+async function createFFmpeg(): Promise<FFmpeg> {
   if (typeof SharedArrayBuffer === 'undefined') {
     throw new Error(
       'SharedArrayBuffer is not available. ' +
@@ -15,15 +27,9 @@ async function getFFmpeg(onLog?: (msg: string) => void): Promise<FFmpeg> {
     )
   }
 
+  const { coreURL, wasmURL } = await loadBlobUrls()
   const ff = new FFmpeg()
-  if (onLog) ff.on('log', ({ message }) => onLog(message))
-
-  const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm'
-  await ff.load({
-    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-  })
-  ffmpegInstance = ff
+  await ff.load({ coreURL, wasmURL })
   return ff
 }
 
@@ -45,9 +51,9 @@ function buildFFmpegArgs(options: ExportOptions): string[] {
       return [
         '-framerate', String(fps),
         '-i', input,
-        '-c:v', 'libvpx-vp9',
-        '-b:v', '0',
-        '-crf', '30',
+        '-c:v', 'libvpx',
+        '-b:v', '1M',
+        '-deadline', 'realtime',
         'output.webm',
       ]
     case 'gif':
@@ -65,7 +71,11 @@ export async function encodeFrames(
   options: ExportOptions,
   onProgress: (ratio: number) => void,
 ): Promise<Uint8Array> {
-  const ff = await getFFmpeg()
+  const ff = await createFFmpeg()
+
+  ff.on('progress', ({ progress }) => {
+    onProgress(Math.min(1, Math.max(0, progress)))
+  })
 
   // Write all PNG frames to ffmpeg virtual FS
   for (let i = 0; i < frames.length; i++) {
@@ -75,20 +85,16 @@ export async function encodeFrames(
 
   const outputName = `output.${options.format}`
 
-  ff.on('progress', ({ progress }) => {
-    onProgress(Math.min(1, Math.max(0, progress)))
-  })
-
-  await ff.exec(buildFFmpegArgs(options))
-
-  const data = await ff.readFile(outputName)
-
-  // Cleanup virtual FS
-  for (let i = 0; i < frames.length; i++) {
-    const name = `frame${String(i).padStart(4, '0')}.png`
-    await ff.deleteFile(name).catch(() => {})
+  try {
+    await ff.exec(buildFFmpegArgs(options))
+    const data = await ff.readFile(outputName)
+    return data instanceof Uint8Array ? data : new TextEncoder().encode(data)
+  } finally {
+    // Always terminate the worker and clean up FS, even on error.
+    for (let i = 0; i < frames.length; i++) {
+      await ff.deleteFile(`frame${String(i).padStart(4, '0')}.png`).catch(() => {})
+    }
+    await ff.deleteFile(outputName).catch(() => {})
+    ff.terminate()
   }
-  await ff.deleteFile(outputName).catch(() => {})
-
-  return data instanceof Uint8Array ? data : new TextEncoder().encode(data)
 }
