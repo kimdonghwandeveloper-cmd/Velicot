@@ -54,6 +54,8 @@ function buildFFmpegArgs(options: ExportOptions): string[] {
         '-c:v', 'libvpx',
         '-b:v', '1M',
         '-deadline', 'realtime',
+        '-auto-alt-ref', '0',
+        '-lag-in-frames', '0',
         'output.webm',
       ]
     case 'gif':
@@ -86,8 +88,14 @@ export async function encodeFrames(
   const outputName = `output.${options.format}`
 
   try {
-    await ff.exec(buildFFmpegArgs(options))
+    const exitCode = await ff.exec(buildFFmpegArgs(options))
+    if (exitCode !== 0) {
+      throw new Error(`ffmpeg exec failed for format "${options.format}" with exit code ${exitCode}`)
+    }
     const data = await ff.readFile(outputName)
+    if (data.length === 0) {
+      throw new Error(`ffmpeg produced an empty output file for format "${options.format}"`)
+    }
     return data instanceof Uint8Array ? data : new TextEncoder().encode(data)
   } finally {
     // Always terminate the worker and clean up FS, even on error.

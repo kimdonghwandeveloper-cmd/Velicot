@@ -1,0 +1,38 @@
+{
+  "version": "1.0",
+  "canvas": { "width": 300, "height": 300 },
+  "layers": [
+    {
+      "id": "body",
+      "svgContent": "<circle cx=\"0\" cy=\"0\" r=\"90\" fill=\"#f59e0b\"/><rect x=\"-10\" y=\"-90\" width=\"20\" height=\"20\" fill=\"#ffffff\"/>",
+      "groupId": "root"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "track_body_translateX",
+      "targetLayerId": "body",
+      "property": "translateX",
+      "keyframes": [
+        { "time": 0, "value": 150, "easing": "linear" }
+      ]
+    },
+    {
+      "id": "track_body_translateY",
+      "targetLayerId": "body",
+      "property": "translateY",
+      "keyframes": [
+        { "time": 0, "value": 150, "easing": "linear" }
+      ]
+    },
+    {
+      "id": "track_body_rotate",
+      "targetLayerId": "body",
+      "property": "rotate",
+      "keyframes": [
+        { "time": 0, "value": 0, "easing": "linear" },
+        { "time": 1000, "value": 360, "easing": "linear" }
+      ]
+    }
+  ]
+}

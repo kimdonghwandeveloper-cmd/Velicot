@@ -1,0 +1,40 @@
+{
+  "version": "1.0",
+  "canvas": { "width": 300, "height": 300 },
+  "layers": [
+    {
+      "id": "body",
+      "svgContent": "<circle cx=\"0\" cy=\"0\" r=\"90\" fill=\"#22c55e\"/><path d=\"M -35 0 L -10 30 L 40 -30\" stroke=\"#ffffff\" stroke-width=\"14\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+      "groupId": "root"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "track_body_translateX",
+      "targetLayerId": "body",
+      "property": "translateX",
+      "keyframes": [
+        { "time": 0, "value": 150, "easing": "linear" }
+      ]
+    },
+    {
+      "id": "track_body_translateY",
+      "targetLayerId": "body",
+      "property": "translateY",
+      "keyframes": [
+        { "time": 0, "value": 150, "easing": "linear" }
+      ]
+    },
+    {
+      "id": "track_body_scale",
+      "targetLayerId": "body",
+      "property": "scale",
+      "keyframes": [
+        { "time": 0, "value": 0, "easing": "easeOut" },
+        { "time": 400, "value": 1.15, "easing": "easeOut" },
+        { "time": 700, "value": 0.95, "easing": "easeInOut" },
+        { "time": 1000, "value": 1, "easing": "easeInOut" }
+      ]
+    }
+  ]
+}

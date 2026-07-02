@@ -8,7 +8,7 @@ vi.mock('@ffmpeg/ffmpeg', () => ({
     load: vi.fn().mockResolvedValue(undefined),
     on: vi.fn(),
     writeFile: vi.fn().mockResolvedValue(undefined),
-    exec: vi.fn().mockResolvedValue(undefined),
+    exec: vi.fn().mockResolvedValue(0),
     readFile: vi.fn().mockResolvedValue(new Uint8Array([0x00, 0x01])),
     deleteFile: vi.fn().mockResolvedValue(undefined),
     terminate: vi.fn(),
@@ -82,5 +82,77 @@ describe('encodeFrames', () => {
     vi.stubGlobal('SharedArrayBuffer', class SharedArrayBuffer {
       constructor(public byteLength: number) {}
     })
+  })
+
+  const manyFrames = Array.from({ length: 12 }, () => pngFrame)
+
+  it.each(['mp4', 'webm', 'gif'] as const)(
+    'returns a Uint8Array for %s format with a single frame',
+    async (format) => {
+      const { encodeFrames } = await import('../encoder')
+      const opts: ExportOptions = { format, fps: 30, width: 64, height: 64 }
+      const result = await encodeFrames([pngFrame], opts, vi.fn())
+      expect(result).toBeInstanceOf(Uint8Array)
+    },
+  )
+
+  it.each(['mp4', 'webm', 'gif'] as const)(
+    'returns a Uint8Array for %s format with many frames',
+    async (format) => {
+      const { encodeFrames } = await import('../encoder')
+      const opts: ExportOptions = { format, fps: 30, width: 64, height: 64 }
+      const result = await encodeFrames(manyFrames, opts, vi.fn())
+      expect(result).toBeInstanceOf(Uint8Array)
+    },
+  )
+
+  it('passes -auto-alt-ref 0 and -lag-in-frames 0 to avoid libvpx silently dropping output', async () => {
+    const { FFmpeg } = await import('@ffmpeg/ffmpeg')
+    const { encodeFrames } = await import('../encoder')
+    const opts: ExportOptions = { format: 'webm', fps: 30, width: 64, height: 64 }
+    await encodeFrames([pngFrame], opts, vi.fn())
+
+    const ffMock = (FFmpeg as ReturnType<typeof vi.fn>).mock.results.at(-1)?.value
+    const execArgs = ffMock.exec.mock.calls.at(-1)?.[0] as string[]
+    expect(execArgs).toContain('-auto-alt-ref')
+    expect(execArgs[execArgs.indexOf('-auto-alt-ref') + 1]).toBe('0')
+    expect(execArgs).toContain('-lag-in-frames')
+    expect(execArgs[execArgs.indexOf('-lag-in-frames') + 1]).toBe('0')
+  })
+
+  it('throws when ffmpeg exec returns a non-zero exit code instead of silently succeeding', async () => {
+    const { FFmpeg } = await import('@ffmpeg/ffmpeg')
+    ;(FFmpeg as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+      loaded: false,
+      load: vi.fn().mockResolvedValue(undefined),
+      on: vi.fn(),
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      exec: vi.fn().mockResolvedValue(1),
+      readFile: vi.fn().mockResolvedValue(new Uint8Array([0x00, 0x01])),
+      deleteFile: vi.fn().mockResolvedValue(undefined),
+      terminate: vi.fn(),
+    }))
+
+    const { encodeFrames } = await import('../encoder')
+    const opts: ExportOptions = { format: 'webm', fps: 30, width: 64, height: 64 }
+    await expect(encodeFrames([pngFrame], opts, vi.fn())).rejects.toThrow('exit code')
+  })
+
+  it('throws when ffmpeg produces an empty output file instead of returning it as a success', async () => {
+    const { FFmpeg } = await import('@ffmpeg/ffmpeg')
+    ;(FFmpeg as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+      loaded: false,
+      load: vi.fn().mockResolvedValue(undefined),
+      on: vi.fn(),
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      exec: vi.fn().mockResolvedValue(0),
+      readFile: vi.fn().mockResolvedValue(new Uint8Array([])),
+      deleteFile: vi.fn().mockResolvedValue(undefined),
+      terminate: vi.fn(),
+    }))
+
+    const { encodeFrames } = await import('../encoder')
+    const opts: ExportOptions = { format: 'webm', fps: 30, width: 64, height: 64 }
+    await expect(encodeFrames([pngFrame], opts, vi.fn())).rejects.toThrow('empty output')
   })
 })
