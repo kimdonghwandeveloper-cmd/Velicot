@@ -1,0 +1,19 @@
+{
+  "version": "1.0",
+  "canvas": { "width": 300, "height": 300 },
+  "layers": [
+    { "id": "body", "svgContent": "<circle cx=\"150\" cy=\"150\" r=\"90\" fill=\"#6366f1\"/><rect x=\"140\" y=\"70\" width=\"20\" height=\"20\" fill=\"#ffffff\"/>", "groupId": "root" }
+  ],
+  "tracks": [
+    {
+      "id": "track_body_opacity",
+      "targetLayerId": "body",
+      "property": "opacity",
+      "keyframes": [
+        { "time": 0, "value": 1, "easing": "linear" },
+        { "time": 500, "value": 0.6, "easing": "easeInOut" },
+        { "time": 1000, "value": 1, "easing": "easeInOut" }
+      ]
+    }
+  ]
+}

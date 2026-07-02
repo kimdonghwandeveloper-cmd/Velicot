@@ -1,0 +1,28 @@
+{
+  "version": "1.0",
+  "canvas": { "width": 300, "height": 300 },
+  "layers": [
+    {
+      "id": "body",
+      "svgContent": "<circle cx=\"150\" cy=\"150\" r=\"90\" fill=\"#ef4444\"/><path d=\"M 115 115 L 185 185 M 185 115 L 115 185\" stroke=\"#ffffff\" stroke-width=\"14\" fill=\"none\" stroke-linecap=\"round\"/>",
+      "groupId": "root"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "track_body_translateX",
+      "targetLayerId": "body",
+      "property": "translateX",
+      "keyframes": [
+        { "time": 0, "value": 0, "easing": "linear" },
+        { "time": 150, "value": -14, "easing": "linear" },
+        { "time": 300, "value": 14, "easing": "linear" },
+        { "time": 450, "value": -10, "easing": "linear" },
+        { "time": 600, "value": 10, "easing": "linear" },
+        { "time": 750, "value": -4, "easing": "linear" },
+        { "time": 900, "value": 4, "easing": "linear" },
+        { "time": 1000, "value": 0, "easing": "linear" }
+      ]
+    }
+  ]
+}
